@@ -55,6 +55,7 @@ export default function StagePage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const stageConfig = STAGE_CONFIG[stageNumber as keyof typeof STAGE_CONFIG];
@@ -220,6 +221,64 @@ export default function StagePage() {
     }
   };
 
+  const completeStage = async () => {
+    if (messages.length < 3) {
+      alert("Please have a conversation with the agent before completing this stage.");
+      return;
+    }
+
+    setCompleting(true);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/auth/login");
+        return;
+      }
+
+      // Save conversation to stage
+      const conversationSummary = messages
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n\n");
+
+      const response = await fetch(
+        `/api/projects/${projectId}/stages/${stageNumber}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            completed: true,
+            summary: conversationSummary,
+            responses: { messages },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to complete stage");
+      }
+
+      // Navigate to next stage or dashboard
+      if (stageNumber < 3) {
+        router.push(`/projects/${projectId}/stage/${stageNumber + 1}`);
+      } else {
+        // All stages complete - go to dashboard or PRD page
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Error completing stage:", error);
+      alert("Failed to complete stage. Please try again.");
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -336,7 +395,7 @@ export default function StagePage() {
 
       {/* Input */}
       <div className="border-t border-border bg-background">
-        <div className="container mx-auto px-4 py-4 max-w-4xl">
+        <div className="container mx-auto px-4 py-4 max-w-4xl space-y-3">
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -359,9 +418,40 @@ export default function StagePage() {
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Press Enter to send, Shift+Enter for new line
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+            {messages.length >= 3 && (
+              <Button
+                onClick={completeStage}
+                disabled={completing || sending || streaming}
+                variant="default"
+                size="sm"
+              >
+                {completing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    {stageNumber < 3 ? (
+                      <>
+                        Complete & Continue to Stage {stageNumber + 1}
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    ) : (
+                      <>
+                        Complete Final Stage
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
