@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowRight, Lightbulb, Layers, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,7 +19,12 @@ export default function Home() {
               Vibe Coding Launchpad
             </span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-4">
+            <Link href="/auth/login">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -36,19 +42,23 @@ export default function Home() {
             accelerate development.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <Button size="lg" className="text-base">
-              Start Your Project
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="text-base">
-              Learn More
-            </Button>
+            <Link href="/auth/signup">
+              <Button size="lg" className="text-base">
+                Start Your Project
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="#workflow">
+              <Button size="lg" variant="outline" className="text-base">
+                Learn More
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Workflow Section */}
-      <section className="border-t border-border bg-muted/30">
+      <section id="workflow" className="border-t border-border bg-muted/30">
         <div className="container mx-auto px-4 py-24">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">

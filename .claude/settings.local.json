@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: integrate BMAD method framework with Claude AI\n\nImplemented core infrastructure for BMAD-powered project planning:\n\n- Install official bmad-method@6.0.0-alpha.7 package\n- Integrate BMAD core agents (Analyst, Architect, PM, Developer)\n- Add Claude Code slash commands for BMAD workflows\n- Create Supabase database schema with 5 tables\n- Implement authentication system (login/signup/callback)\n- Build Claude AI integration with streaming support\n- Create API routes for projects and stages management\n- Add TypeScript types for database and services\n- Set up environment configuration\n\nThe application now uses the actual BMAD Method framework (not a simulation)\nto guide users through structured project planning with AI assistance.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo create:*)",
+      "Bash(npm run dev:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
     ],
     "deny": [],
     "ask": []

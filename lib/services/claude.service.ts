@@ -18,18 +18,18 @@ export interface ClaudeStreamResponse {
 
 /**
  * Initialize Claude client
- * @param apiKey - Anthropic API key (user's own key or app key)
+ * @param apiKey - User's Anthropic API key (required)
  * @returns Anthropic client instance
  */
-export function createClaudeClient(apiKey?: string): Anthropic {
-  const key = apiKey || process.env.ANTHROPIC_API_KEY;
-
-  if (!key) {
-    throw new Error("Anthropic API key is required");
+export function createClaudeClient(apiKey: string): Anthropic {
+  if (!apiKey) {
+    throw new Error(
+      "Anthropic API key is required. Please connect your Anthropic account in settings."
+    );
   }
 
   return new Anthropic({
-    apiKey: key,
+    apiKey: apiKey,
   });
 }
 
