@@ -57,6 +57,7 @@ export default function StagePage() {
   const [streaming, setStreaming] = useState(false);
   const [completing, setCompleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const stageConfig = STAGE_CONFIG[stageNumber as keyof typeof STAGE_CONFIG];
 
@@ -67,6 +68,14 @@ export default function StagePage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [input]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -301,8 +310,8 @@ export default function StagePage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="border-b border-border bg-muted/30">
+      {/* Header - Sticky */}
+      <div className="sticky top-0 z-10 border-b border-border bg-muted/30 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -329,8 +338,8 @@ export default function StagePage() {
         </div>
       </div>
 
-      {/* Stage Progress */}
-      <div className="border-b border-border bg-background">
+      {/* Stage Progress - Sticky */}
+      <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-center gap-2">
             {[1, 2, 3].map((stage) => (
@@ -398,13 +407,15 @@ export default function StagePage() {
         <div className="container mx-auto px-4 py-4 max-w-4xl space-y-3">
           <div className="flex gap-2">
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${stageConfig.agentName}...`}
               rows={1}
-              className="flex-1 px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none"
+              className="flex-1 px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none overflow-hidden min-h-[42px] max-h-[200px]"
               disabled={sending || streaming}
+              style={{ height: "auto" }}
             />
             <Button
               onClick={sendMessage}
