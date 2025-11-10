@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Loader2,
   LogOut,
+  FileText,
 } from "lucide-react";
 
 interface Project {
@@ -310,10 +311,7 @@ export default function DashboardPage() {
             {projects.map((project) => (
               <div
                 key={project.id}
-                onClick={() =>
-                  router.push(`/projects/${project.id}/stage/${project.current_stage}`)
-                }
-                className="bg-muted/30 border border-border rounded-lg p-6 hover:border-foreground/50 transition-colors cursor-pointer space-y-4"
+                className="bg-muted/30 border border-border rounded-lg p-6 hover:border-foreground/50 transition-colors space-y-4"
               >
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-lg">{project.name}</h3>
@@ -338,6 +336,30 @@ export default function DashboardPage() {
 
                 <div className="text-xs text-muted-foreground">
                   Created {new Date(project.created_at).toLocaleDateString()}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
+                  {project.status === "completed" ? (
+                    <Button
+                      onClick={() => router.push(`/projects/${project.id}/prd`)}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      View PRD
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() =>
+                        router.push(`/projects/${project.id}/stage/${project.current_stage}`)
+                      }
+                      className="flex-1"
+                      size="sm"
+                    >
+                      Continue
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
