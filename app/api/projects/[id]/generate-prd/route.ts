@@ -82,10 +82,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
       .limit(1)
       .maybeSingle();
 
-    if (existingPrd && existingPrd.content) {
+    type PrdData = { content: string } | null;
+    const typedExistingPrd = existingPrd as PrdData;
+
+    if (typedExistingPrd && typedExistingPrd.content) {
       // PRD already exists, return it without regenerating
       logger.info("PRD already exists, returning cached version", { projectId });
-      return NextResponse.json({ prd: existingPrd.content });
+      return NextResponse.json({ prd: typedExistingPrd.content });
     }
 
     // Get user's encrypted API key

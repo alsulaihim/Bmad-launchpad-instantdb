@@ -27,7 +27,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.17",
-    "bmad-method": "^6.0.0-alpha.7",
+    "bmad-method": "^4.44.3",
     "eslint": "^8",
     "eslint-config-next": "^15.0.3",
     "postcss": "^8.4.35",
