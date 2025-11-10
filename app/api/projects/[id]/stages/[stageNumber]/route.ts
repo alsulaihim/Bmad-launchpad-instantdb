@@ -11,18 +11,19 @@ import { logger } from "@/lib/logger";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
     stageNumber: string;
-  };
+  }>;
 }
 
 /**
  * GET /api/projects/[id]/stages/[stageNumber]
  * Fetch a specific project stage
  */
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const params = await context.params;
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
@@ -101,7 +102,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
  * PATCH /api/projects/[id]/stages/[stageNumber]
  * Update a project stage
  */
-export async function PATCH(req: NextRequest, { params }: RouteParams) {
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  const params = await context.params;
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
@@ -170,7 +172,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     // Update stage
     const { data: stage, error } = await supabase
       .from("project_stages")
-      .update(updates)
+      .update(updates as never)
       .eq("project_id", projectId)
       .eq("stage_number", stageNum)
       .select()
@@ -188,7 +190,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     if (completed && stageNum < 3) {
       await supabase
         .from("projects")
-        .update({ current_stage: stageNum + 1 })
+        .update({ current_stage: stageNum + 1 } as never)
         .eq("id", projectId);
     }
 

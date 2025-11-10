@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, CheckCircle, ExternalLink } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -14,10 +15,6 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   const checkAuth = async () => {
     const {
       data: { user },
@@ -26,6 +23,11 @@ export default function OnboardingPage() {
       router.push("/auth/login");
     }
   };
+
+  useEffect(() => {
+    checkAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const testApiKey = async () => {
     if (!apiKey.trim()) {
@@ -59,7 +61,7 @@ export default function OnboardingPage() {
 
       setSuccess(true);
       setTimeout(() => saveAndContinue(), 1500);
-    } catch (err) {
+    } catch {
       setError("Failed to validate API key. Please try again.");
     } finally {
       setTesting(false);
@@ -96,7 +98,7 @@ export default function OnboardingPage() {
       }
 
       router.push("/dashboard");
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred");
     } finally {
       setLoading(false);
@@ -105,13 +107,18 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Theme Toggle - Top Right */}
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
+      </div>
+
       <div className="w-full max-w-2xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="inline-block h-12 w-12 bg-foreground rounded mb-4" />
           <h1 className="text-3xl font-bold">Connect Your Anthropic Account</h1>
           <p className="text-muted-foreground text-lg">
-            To use the BMAD Framework with Claude AI, you'll need an Anthropic
+            To use the BMAD Framework with Claude AI, you&apos;ll need an Anthropic
             API key
           </p>
         </div>
@@ -144,7 +151,7 @@ export default function OnboardingPage() {
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-foreground">3.</span>
-                <span>Click "Create Key" and name it "BMAD-Launchpad"</span>
+                <span>Click &quot;Create Key&quot; and name it &quot;BMAD-Launchpad&quot;</span>
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-foreground">4.</span>
@@ -175,7 +182,7 @@ export default function OnboardingPage() {
                 className="w-full px-4 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-foreground font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Your API key is encrypted and stored securely. It's only used to
+                Your API key is encrypted and stored securely. It&apos;s only used to
                 make Claude API calls on your behalf.
               </p>
             </div>
@@ -258,7 +265,7 @@ export default function OnboardingPage() {
             Skip for now
           </button>
           <br />
-          <span className="text-xs">(You'll need to add it later to use BMAD)</span>
+          <span className="text-xs">(You&apos;ll need to add it later to use BMAD)</span>
         </div>
       </div>
     </div>

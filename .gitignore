@@ -32,6 +32,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Railway environment files (contain secrets)
+.railway/*.env
+!.railway/SETUP_GUIDE.md
+
 # vercel
 .vercel
 

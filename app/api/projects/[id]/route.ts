@@ -11,17 +11,18 @@ import { logger } from "@/lib/logger";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 /**
  * GET /api/projects/[id]
  * Fetch a specific project
  */
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const params = await context.params;
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {

@@ -71,10 +71,12 @@ class Logger {
           console.warn(JSON.stringify(logEntry, null, 2));
           break;
         default:
+          // eslint-disable-next-line no-console
           console.log(JSON.stringify(logEntry, null, 2));
       }
     } else {
       // In production, use structured JSON logging
+      // eslint-disable-next-line no-console
       console.log(JSON.stringify(logEntry));
     }
   }

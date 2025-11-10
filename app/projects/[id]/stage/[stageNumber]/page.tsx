@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Send, Sparkles, Check } from "lucide-react";
 import { generateAgentGreeting } from "@/lib/services/claude.service";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface Message {
   role: "user" | "assistant";
@@ -56,13 +57,19 @@ export default function StagePage() {
   const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [stageSummary, setStageSummary] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const stageConfig = STAGE_CONFIG[stageNumber as keyof typeof STAGE_CONFIG];
 
   useEffect(() => {
     loadProject();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   useEffect(() => {
@@ -77,8 +84,63 @@ export default function StagePage() {
     }
   }, [input]);
 
+  useEffect(() => {
+    // Auto-save conversation after messages change (debounced)
+    if (messages.length > 1) { // Only save if there's actual conversation (more than just greeting)
+      // Clear previous timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+
+      // Set new timeout to save after 2 seconds of inactivity
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        autoSaveConversation();
+      }, 2000);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const autoSaveConversation = async () => {
+    try {
+      setAutoSaving(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) return;
+
+      const conversationSummary = messages
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n\n");
+
+      await fetch(`/api/projects/${projectId}/stages/${stageNumber}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          summary: conversationSummary,
+          responses: { messages },
+        }),
+      });
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+    } finally {
+      setAutoSaving(false);
+    }
   };
 
   const loadProject = async () => {
@@ -102,7 +164,7 @@ export default function StagePage() {
         throw new Error("Failed to load project");
       }
 
-      const data = await response.json();
+      const stageData = await response.json();
 
       // Load project details
       const projectResponse = await fetch("/api/projects", {
@@ -113,21 +175,83 @@ export default function StagePage() {
 
       if (projectResponse.ok) {
         const projectsData = await projectResponse.json();
-        const currentProject = projectsData.projects.find((p: any) => p.id === projectId);
+        const currentProject = projectsData.projects.find((p: { id: string }) => p.id === projectId);
         setProject(currentProject);
 
-        // Initialize with agent greeting
-        const greeting = generateAgentGreeting(
-          stageConfig.agentType,
-          currentProject?.name
-        );
-        setMessages([{ role: "assistant", content: greeting }]);
+        // Check for saved conversation
+        if (stageData.stage?.responses?.messages && Array.isArray(stageData.stage.responses.messages)) {
+          // Restore saved conversation
+          setMessages(stageData.stage.responses.messages);
+        } else {
+          // Initialize with agent greeting (new conversation)
+          let greeting = generateAgentGreeting(
+            stageConfig.agentType,
+            currentProject?.name
+          );
+
+          // For stages 2 and 3, add context from previous stages
+          if (stageNumber > 1) {
+            const previousContext = await loadPreviousStagesContext(session.access_token);
+            if (previousContext) {
+              greeting += `\n\n**Context from previous stage${stageNumber > 2 ? "s" : ""}:**\n${previousContext}`;
+            }
+          }
+
+          setMessages([{ role: "assistant", content: greeting }]);
+        }
       }
 
       setLoading(false);
     } catch (error) {
       console.error("Error loading project:", error);
       setLoading(false);
+    }
+  };
+
+  const loadPreviousStagesContext = async (token: string): Promise<string | null> => {
+    try {
+      let context = "";
+
+      // Load Stage 1 summary if we're in Stage 2 or 3
+      if (stageNumber >= 2) {
+        const stage1Response = await fetch(
+          `/api/projects/${projectId}/stages/1`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (stage1Response.ok) {
+          const stage1Data = await stage1Response.json();
+          if (stage1Data.stage?.completed && stage1Data.stage?.summary) {
+            const summary = stage1Data.stage.summary.split("\n\n").slice(0, 3).join("\n\n");
+            context += `\n**Requirements & Goals (Stage 1):**\n${summary.substring(0, 500)}...\n`;
+          }
+        }
+      }
+
+      // Load Stage 2 summary if we're in Stage 3
+      if (stageNumber === 3) {
+        const stage2Response = await fetch(
+          `/api/projects/${projectId}/stages/2`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (stage2Response.ok) {
+          const stage2Data = await stage2Response.json();
+          if (stage2Data.stage?.completed && stage2Data.stage?.summary) {
+            const summary = stage2Data.stage.summary.split("\n\n").slice(0, 3).join("\n\n");
+            context += `\n**Tech Stack & Architecture (Stage 2):**\n${summary.substring(0, 500)}...\n`;
+          }
+        }
+      }
+
+      return context || null;
+    } catch (error) {
+      console.error("Error loading previous stages:", error);
+      return null;
     }
   };
 
@@ -199,7 +323,7 @@ export default function StagePage() {
                 if (data.done) {
                   break;
                 }
-              } catch (e) {
+              } catch {
                 // Ignore parsing errors
               }
             }
@@ -230,12 +354,72 @@ export default function StagePage() {
     }
   };
 
-  const completeStage = async () => {
-    if (messages.length < 3) {
-      alert("Please have a conversation with the agent before completing this stage.");
+  const generateStageSummary = async () => {
+    setGeneratingSummary(true);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/auth/login");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/projects/${projectId}/stages/${stageNumber}/generate-summary`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setStageSummary(data.summary);
+      } else {
+        // Fallback to basic summary
+        const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${Math.floor((messages.length - 1) / 2)} exchanges.`;
+        setStageSummary(basicSummary);
+      }
+    } catch (error) {
+      console.error("Failed to generate summary:", error);
+      const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${Math.floor((messages.length - 1) / 2)} exchanges.`;
+      setStageSummary(basicSummary);
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  const requestStageSummary = async () => {
+    // Validate minimum conversation depth
+    const minMessages = {
+      1: 10, // Stage 1: Requirements gathering needs substantial discussion
+      2: 8,  // Stage 2: Architecture decisions need thorough exploration
+      3: 8,  // Stage 3: UI/UX needs detailed planning
+    };
+
+    const requiredMessages = minMessages[stageNumber as keyof typeof minMessages];
+
+    if (messages.length < requiredMessages) {
+      alert(
+        `Please have a more comprehensive conversation with the ${stageConfig.agentName}. ` +
+        `This stage requires at least ${Math.ceil(requiredMessages / 2)} meaningful exchanges to ensure quality requirements. ` +
+        `Current: ${Math.floor((messages.length - 1) / 2)} exchanges.`
+      );
       return;
     }
 
+    // Show summary modal and generate summary
+    setShowSummary(true);
+    await generateStageSummary();
+  };
+
+  const completeStage = async () => {
     setCompleting(true);
 
     try {
@@ -248,11 +432,12 @@ export default function StagePage() {
         return;
       }
 
-      // Save conversation to stage
+      // Generate AI summary of the conversation
       const conversationSummary = messages
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n\n");
 
+      // Save stage completion
       const response = await fetch(
         `/api/projects/${projectId}/stages/${stageNumber}`,
         {
@@ -273,12 +458,28 @@ export default function StagePage() {
         throw new Error("Failed to complete stage");
       }
 
-      // Navigate to next stage or dashboard
+      // Generate draft document after Stage 1
+      if (stageNumber === 1) {
+        try {
+          await fetch(`/api/projects/${projectId}/generate-draft`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          // Don't block navigation if draft generation fails
+        } catch (error) {
+          console.error("Draft generation failed (non-blocking):", error);
+        }
+      }
+
+      // Navigate to next stage or PRD generation
       if (stageNumber < 3) {
         router.push(`/projects/${projectId}/stage/${stageNumber + 1}`);
       } else {
-        // All stages complete - go to dashboard or PRD page
-        router.push("/dashboard");
+        // All 3 stages complete - generate PRD
+        router.push(`/projects/${projectId}/prd`);
       }
     } catch (error) {
       console.error("Error completing stage:", error);
@@ -330,9 +531,24 @@ export default function StagePage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Sparkles className={`h-5 w-5 text-${stageConfig.color}-500`} />
-              <span className="text-sm font-medium">{stageConfig.agentName}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className={`h-5 w-5 text-${stageConfig.color}-500`} />
+                <span className="text-sm font-medium">{stageConfig.agentName}</span>
+              </div>
+              {autoSaving && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Saving...</span>
+                </div>
+              )}
+              {!autoSaving && messages.length > 1 && (
+                <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                  <Check className="h-3 w-3" />
+                  <span>Saved</span>
+                </div>
+              )}
+              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -342,23 +558,51 @@ export default function StagePage() {
       <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-center gap-2">
-            {[1, 2, 3].map((stage) => (
-              <div key={stage} className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                    stage === stageNumber
-                      ? "border-foreground bg-foreground text-background"
-                      : stage < stageNumber
-                      ? "border-green-500 bg-green-500 text-white"
-                      : "border-border bg-background text-muted-foreground"
+            {[
+              { number: 1, name: "Requirements" },
+              { number: 2, name: "Architecture" },
+              { number: 3, name: "UI/UX" },
+            ].map((stage) => (
+              <div key={stage.number} className="flex items-center">
+                <button
+                  onClick={() => {
+                    if (stage.number < stageNumber) {
+                      // Allow navigation to completed stages
+                      router.push(`/projects/${projectId}/stage/${stage.number}`);
+                    }
+                  }}
+                  disabled={stage.number >= stageNumber}
+                  className={`flex flex-col items-center ${
+                    stage.number < stageNumber ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
                   }`}
                 >
-                  {stage}
-                </div>
-                {stage < 3 && (
                   <div
-                    className={`w-16 h-0.5 ${
-                      stage < stageNumber ? "bg-green-500" : "bg-border"
+                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                      stage.number === stageNumber
+                        ? "border-foreground bg-foreground text-background"
+                        : stage.number < stageNumber
+                        ? "border-green-500 bg-green-500 text-white"
+                        : "border-border bg-background text-muted-foreground"
+                    }`}
+                  >
+                    {stage.number}
+                  </div>
+                  <span
+                    className={`text-xs mt-1 ${
+                      stage.number === stageNumber
+                        ? "text-foreground font-medium"
+                        : stage.number < stageNumber
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {stage.name}
+                  </span>
+                </button>
+                {stage.number < 3 && (
+                  <div
+                    className={`w-16 h-0.5 mb-5 ${
+                      stage.number < stageNumber ? "bg-green-500" : "bg-border"
                     }`}
                   />
                 )}
@@ -434,37 +678,132 @@ export default function StagePage() {
               Press Enter to send, Shift+Enter for new line
             </p>
             {messages.length >= 3 && (
-              <Button
-                onClick={completeStage}
-                disabled={completing || sending || streaming}
-                variant="default"
-                size="sm"
-              >
-                {completing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    {stageNumber < 3 ? (
-                      <>
-                        Complete & Continue to Stage {stageNumber + 1}
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </>
-                    ) : (
-                      <>
-                        Complete Final Stage
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </>
-                    )}
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const minMessages = { 1: 10, 2: 8, 3: 8 };
+                  const required = minMessages[stageNumber as keyof typeof minMessages];
+                  const current = Math.floor((messages.length - 1) / 2);
+                  const target = Math.ceil(required / 2);
+                  const isReady = messages.length >= required;
+
+                  return (
+                    <>
+                      <span className={`text-xs ${isReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                        {current}/{target} exchanges
+                      </span>
+                      <Button
+                        onClick={requestStageSummary}
+                        disabled={completing || sending || streaming}
+                        variant={isReady ? "default" : "outline"}
+                        size="sm"
+                      >
+                        {completing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            {stageNumber < 3 ? (
+                              <>
+                                Complete & Continue to Stage {stageNumber + 1}
+                                <ArrowRight className="h-4 w-4 ml-2" />
+                              </>
+                            ) : (
+                              <>
+                                Complete & Generate PRD
+                                <ArrowRight className="h-4 w-4 ml-2" />
+                              </>
+                            )}
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Summary Modal */}
+      {showSummary && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="border-b border-border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Stage {stageNumber} Summary</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Review your key takeaways and decide next steps
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSummary(false)}
+                  disabled={completing}
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {generatingSummary ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Generating AI summary...</p>
+                </div>
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <div className="whitespace-pre-wrap">{stageSummary}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="border-t border-border p-6">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSummary(false)}
+                  disabled={completing || generatingSummary}
+                  className="flex-1"
+                >
+                  Continue Refining
+                </Button>
+                <Button
+                  onClick={completeStage}
+                  disabled={completing || generatingSummary}
+                  className="flex-1"
+                >
+                  {completing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Proceeding...
+                    </>
+                  ) : (
+                    <>
+                      {stageNumber < 3 ? `Proceed to Stage ${stageNumber + 1}` : "Generate PRD"}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {stageNumber === 1 && (
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  💡 A draft document will be generated after completing this stage
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

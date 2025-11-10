@@ -40,6 +40,7 @@ export default function DashboardPage() {
   useEffect(() => {
     checkAuthAndApiKey();
     fetchProjects();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAuthAndApiKey = async () => {
@@ -69,7 +70,7 @@ export default function DashboardPage() {
           const data = await response.json();
           setHasApiKey(data.hasApiKey);
         }
-      } catch (error) {
+      } catch {
         console.error("Failed to check API key status");
       }
     }
@@ -95,7 +96,7 @@ export default function DashboardPage() {
         const data = await response.json();
         setProjects(data.projects || []);
       }
-    } catch (error) {
+    } catch {
       console.error("Failed to fetch projects");
     } finally {
       setLoading(false);
@@ -130,7 +131,7 @@ export default function DashboardPage() {
         const data = await response.json();
         router.push(`/projects/${data.project.id}/stage/1`);
       }
-    } catch (error) {
+    } catch {
       console.error("Failed to create project");
     } finally {
       setCreating(false);

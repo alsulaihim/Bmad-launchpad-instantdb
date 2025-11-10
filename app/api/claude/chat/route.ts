@@ -56,7 +56,10 @@ export async function POST(req: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile?.anthropic_api_key) {
+    type ProfileData = { anthropic_api_key: string | null } | null;
+    const typedProfile = profile as ProfileData;
+
+    if (profileError || !typedProfile || !typedProfile.anthropic_api_key) {
       return NextResponse.json(
         {
           error:
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Decrypt the API key
-    const apiKey = decrypt(profile.anthropic_api_key);
+    const apiKey = decrypt(typedProfile.anthropic_api_key);
 
     const body: ChatRequest = await req.json();
     const { messages, agentType } = body;

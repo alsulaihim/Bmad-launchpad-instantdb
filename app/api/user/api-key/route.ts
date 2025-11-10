@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/types/database.types";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       .update({
         anthropic_api_key: encryptedKey,
         updated_at: new Date().toISOString(),
-      })
+      } as never)
       .eq("id", user.id);
 
     if (updateError) {
@@ -132,6 +132,9 @@ export async function GET(req: NextRequest) {
       .eq("id", user.id)
       .single();
 
+    type ProfileData = { anthropic_api_key: string | null } | null;
+    const typedProfile = profile as ProfileData;
+
     if (error) {
       logger.error("Failed to fetch API key status", {
         error,
@@ -144,7 +147,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      hasApiKey: !!profile?.anthropic_api_key,
+      hasApiKey: !!typedProfile?.anthropic_api_key,
       // Never return the actual key
     });
   } catch (error) {

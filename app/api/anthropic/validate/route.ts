@@ -44,17 +44,19 @@ export async function POST(req: NextRequest) {
         valid: true,
         message: "API key is valid",
       });
-    } catch (error: any) {
-      logger.error("API key validation failed", { error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorStatus = (error as { status?: number }).status;
+      logger.error("API key validation failed", { error: errorMessage });
 
-      if (error.status === 401) {
+      if (errorStatus === 401) {
         return NextResponse.json(
           { error: "Invalid API key. Please check your key and try again." },
           { status: 401 }
         );
       }
 
-      if (error.status === 429) {
+      if (errorStatus === 429) {
         return NextResponse.json(
           { error: "Rate limit exceeded. Please try again in a moment." },
           { status: 429 }

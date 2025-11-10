@@ -115,11 +115,14 @@ export async function POST(req: NextRequest) {
         description: description || null,
         status: "in_progress",
         current_stage: 1,
-      })
+      } as never)
       .select()
       .single();
 
-    if (error) {
+    type ProjectData = { id: string; [key: string]: unknown } | null;
+    const typedProject = project as ProjectData;
+
+    if (error || !typedProject) {
       logger.error("Error creating project", { error, userId: user.id });
       return NextResponse.json(
         { error: "Failed to create project" },
@@ -136,25 +139,25 @@ export async function POST(req: NextRequest) {
 
     const { error: stagesError } = await supabase.from("project_stages").insert(
       stages.map((stage) => ({
-        project_id: project.id,
+        project_id: typedProject.id,
         stage_number: stage.stage_number,
         stage_name: stage.stage_name,
         responses: {},
         completed: false,
-      }))
+      })) as never
     );
 
     if (stagesError) {
       logger.error("Error creating project stages", {
         error: stagesError,
-        projectId: project.id,
+        projectId: typedProject.id,
       });
       // Don't fail the request, stages can be created later
     }
 
-    logger.info("Project created", { projectId: project.id, userId: user.id });
+    logger.info("Project created", { projectId: typedProject.id, userId: user.id });
 
-    return NextResponse.json({ project }, { status: 201 });
+    return NextResponse.json({ project: typedProject }, { status: 201 });
   } catch (error) {
     logger.error("Error in POST /api/projects", { error });
     return NextResponse.json(
