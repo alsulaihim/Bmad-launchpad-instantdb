@@ -128,7 +128,7 @@ export async function sendMessage(
  * @returns System prompt for the agent
  */
 export async function loadBMADAgentPrompt(
-  agentType: "analyst" | "architect" | "pm" | "scrum-master" | "developer"
+  agentType: "analyst" | "architect" | "designer" | "pm" | "scrum-master" | "developer"
 ): Promise<string> {
   // In a real implementation, this would load the actual BMAD agent prompts
   // from the bmad/ directory. For now, we'll return simplified prompts.
@@ -154,15 +154,25 @@ Your role is to:
 Help the user select the right technologies and design a solid technical foundation.
 Explain your recommendations and provide alternatives when appropriate.`,
 
-    pm: `You are the BMAD Product Manager agent, an expert in product requirements and UX design.
+    designer: `You are the BMAD UI/UX Designer agent, an expert in user interface and user experience design.
 Your role is to:
-1. Define user interface requirements and design patterns
-2. Create user stories and acceptance criteria
-3. Establish UX/UI guidelines and component libraries
-4. Ensure alignment with user needs and business goals
+1. Design intuitive user interfaces and interaction patterns
+2. Create wireframes and component specifications
+3. Establish design systems and visual guidelines
+4. Ensure accessibility, responsiveness, and modern UX best practices
 
-Help the user specify comprehensive UI/UX requirements for their project.
-Focus on usability, accessibility, and modern design principles.`,
+Help the user create a comprehensive UI/UX specification for their project.
+Focus on user flows, visual hierarchy, component libraries, and delightful user experiences.
+Ask about user personas, key user journeys, and design preferences.`,
+
+    pm: `You are the BMAD Product Manager agent, an expert in product strategy and requirements coordination.
+Your role is to:
+1. Coordinate between business goals and technical implementation
+2. Create product roadmaps and feature prioritization
+3. Define success metrics and KPIs
+4. Ensure alignment across all project stakeholders
+
+Help the user develop a comprehensive product strategy and execution plan.`,
 
     "scrum-master": `You are the BMAD Scrum Master agent, an expert in agile project management.
 Your role is to facilitate the development process and ensure smooth execution of the BMAD methodology.`,
@@ -197,11 +207,17 @@ Based on your requirements, let's discuss the optimal tech stack and system desi
 
 **What type of application are you building?** (e.g., web app, mobile app, API, desktop application)`,
 
-    pm: `Hi! I'm the BMAD Product Manager agent, and I'll help you define the UI/UX requirements${projectRef}.
+    designer: `Hi! I'm the BMAD UI/UX Designer agent, and I'll help you create an amazing user experience${projectRef}.
 
-Let's create a comprehensive design specification that will guide the development process.
+Let's design an intuitive and beautiful interface that your users will love.
 
-**What is the primary user experience you want to create?** Think about the first interaction a user will have with your product.`,
+**What is the primary user experience you want to create?** Think about the first interaction a user will have with your product and what feeling you want to evoke.`,
+
+    pm: `Hello! I'm the BMAD Product Manager agent, and I'll help you develop a comprehensive product strategy${projectRef}.
+
+Let's align your business goals with technical execution and create a clear product roadmap.
+
+**What are your key business objectives and success metrics for this project?**`,
   };
 
   return (

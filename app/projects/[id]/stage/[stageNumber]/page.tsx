@@ -37,9 +37,9 @@ const STAGE_CONFIG = {
   },
   3: {
     name: "UI/UX Design",
-    agentType: "pm" as const,
-    agentName: "BMAD Product Manager",
-    description: "Define user interface and experience requirements",
+    agentType: "designer" as const,
+    agentName: "BMAD UI/UX Designer",
+    description: "Design user interface and experience requirements",
     color: "green",
   },
 };
