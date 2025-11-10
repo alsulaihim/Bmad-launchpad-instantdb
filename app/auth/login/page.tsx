@@ -250,7 +250,7 @@ export default function LoginPage() {
               )}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              We'll email you a secure link to sign in instantly
+              We&apos;ll email you a secure link to sign in instantly
             </p>
           </div>
         </div>

@@ -21,7 +21,11 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "Bash(npm run build:*)",
-      "Bash(cd /Users/alsulaihim/All-Day-Dev/vibe\\ coding\\ luchpad\\ 0 && npm outdated:*)"
+      "Bash(cd /Users/alsulaihim/All-Day-Dev/vibe\\ coding\\ luchpad\\ 0 && npm outdated:*)",
+      "Bash(git restore:*)",
+      "Bash(cat:*)",
+      "Bash(npm view:*)",
+      "Bash(supabase inspect db calls:*)"
     ],
     "deny": [],
     "ask": []
