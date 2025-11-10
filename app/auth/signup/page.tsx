@@ -53,11 +53,9 @@ export default function SignupPage() {
 
       if (data.user) {
         setMessage(
-          "Account created! Please check your email to verify your account."
+          "✅ Account created! Check your email inbox (and spam folder) for a confirmation link. You can also use the Magic Link option to sign in without waiting for confirmation."
         );
-        setTimeout(() => {
-          router.push("/auth/login");
-        }, 3000);
+        // Don't auto-redirect, let user read the message
       }
     } catch {
       setError("An unexpected error occurred");

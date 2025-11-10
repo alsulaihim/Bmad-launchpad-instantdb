@@ -20,12 +20,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
+    setShowResendConfirmation(false);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -34,7 +36,14 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setError(error.message);
+        // Check if it's an unconfirmed email error
+        if (error.message.toLowerCase().includes("email not confirmed") ||
+            error.message.toLowerCase().includes("invalid login credentials")) {
+          setError("Your email may not be confirmed yet. Please check your email for a confirmation link, or use the Magic Link option below.");
+          setShowResendConfirmation(true);
+        } else {
+          setError(error.message);
+        }
         return;
       }
 
@@ -53,6 +62,7 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    setShowResendConfirmation(false);
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -67,7 +77,35 @@ export default function LoginPage() {
         return;
       }
 
-      setMessage("Check your email for the magic link!");
+      setMessage("✅ Magic link sent! Check your email inbox (and spam folder) to sign in.");
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setMessage("✅ Confirmation email resent! Check your inbox and spam folder.");
+      setShowResendConfirmation(false);
     } catch {
       setError("An unexpected error occurred");
     } finally {
@@ -143,6 +181,31 @@ export default function LoginPage() {
               </div>
             )}
 
+            {showResendConfirmation && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">
+                  Haven't received the confirmation email?
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendConfirmation}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Resending...
+                    </>
+                  ) : (
+                    "Resend Confirmation Email"
+                  )}
+                </Button>
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
@@ -164,27 +227,32 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-2 bg-muted/30 text-muted-foreground">
-                Or
+                Or sign in without password
               </span>
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleMagicLink}
-            disabled={loading || !email}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              "Send Magic Link"
-            )}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleMagicLink}
+              disabled={loading || !email}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Magic Link to Email"
+              )}
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              We'll email you a secure link to sign in instantly
+            </p>
+          </div>
         </div>
 
         {/* Footer */}
