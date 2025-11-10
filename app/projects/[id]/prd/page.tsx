@@ -91,7 +91,24 @@ export default function PRDPage() {
         return;
       }
 
-      // Auto-generate PRD
+      // Check if PRD already exists
+      const prdResponse = await fetch(`/api/projects/${projectId}/prd`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (prdResponse.ok) {
+        const prdData = await prdResponse.json();
+        if (prdData.prd && prdData.prd.content) {
+          // PRD already exists, use it
+          setPrdContent(prdData.prd.content);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // PRD doesn't exist, generate it
       await generatePRD(stagesData);
 
       setLoading(false);

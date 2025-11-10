@@ -73,6 +73,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    // Check if PRD already exists
+    const { data: existingPrd } = await supabase
+      .from("prd_documents")
+      .select("content")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPrd && existingPrd.content) {
+      // PRD already exists, return it without regenerating
+      logger.info("PRD already exists, returning cached version", { projectId });
+      return NextResponse.json({ prd: existingPrd.content });
+    }
+
     // Get user's encrypted API key
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -163,7 +178,6 @@ Based on these three comprehensive discussions, create a professional PRD that c
     const { error: prdError } = await supabase.from("prd_documents").insert({
       project_id: projectId,
       content: prdContent,
-      generated_by: "claude-sonnet-4",
     } as never);
 
     if (prdError) {

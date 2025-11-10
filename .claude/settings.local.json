@@ -20,7 +20,8 @@
       "Bash(curl -s \"https://api.supabase.com/v1/projects/nzqgndedxyprowbqqgsi/api-keys\" -H \"Authorization: Bearer sbp_5a79a3171a965e1e40060cfe07376718aa730eb6\")",
       "Bash(curl:*)",
       "Bash(python3:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(cd /Users/alsulaihim/All-Day-Dev/vibe\\ coding\\ luchpad\\ 0 && npm outdated:*)"
     ],
     "deny": [],
     "ask": []

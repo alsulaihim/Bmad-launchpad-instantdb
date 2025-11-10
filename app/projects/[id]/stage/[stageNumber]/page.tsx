@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Send, Sparkles, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Send, Sparkles, Check, Eye } from "lucide-react";
 import { generateAgentGreeting } from "@/lib/services/claude.service";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -18,6 +18,16 @@ interface ProjectData {
   name: string;
   description: string | null;
   current_stage: number;
+  status: "in_progress" | "completed" | "archived";
+}
+
+interface StageData {
+  stage_number: number;
+  completed: boolean;
+  summary: string | null;
+  responses: {
+    messages: Message[];
+  } | null;
 }
 
 const STAGE_CONFIG = {
@@ -51,7 +61,9 @@ export default function StagePage() {
   const stageNumber = parseInt(params.stageNumber as string);
 
   const [project, setProject] = useState<ProjectData | null>(null);
+  const [stageData, setStageData] = useState<StageData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isReviewMode, setIsReviewMode] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -86,7 +98,8 @@ export default function StagePage() {
 
   useEffect(() => {
     // Auto-save conversation after messages change (debounced)
-    if (messages.length > 1) { // Only save if there's actual conversation (more than just greeting)
+    // Don't auto-save in review mode
+    if (!isReviewMode && messages.length > 1) { // Only save if there's actual conversation (more than just greeting)
       // Clear previous timeout
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
@@ -105,7 +118,7 @@ export default function StagePage() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, isReviewMode]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -164,7 +177,8 @@ export default function StagePage() {
         throw new Error("Failed to load project");
       }
 
-      const stageData = await response.json();
+      const fetchedStageData = await response.json();
+      setStageData(fetchedStageData.stage);
 
       // Load project details
       const projectResponse = await fetch("/api/projects", {
@@ -178,12 +192,21 @@ export default function StagePage() {
         const currentProject = projectsData.projects.find((p: { id: string }) => p.id === projectId);
         setProject(currentProject);
 
+        // Detect review mode: stage is completed AND project is completed
+        const isReviewMode = fetchedStageData.stage?.completed && currentProject?.status === "completed";
+        setIsReviewMode(isReviewMode);
+
+        // If in review mode and has summary, load it
+        if (isReviewMode && fetchedStageData.stage?.summary) {
+          setStageSummary(fetchedStageData.stage.summary);
+        }
+
         // Check for saved conversation
-        if (stageData.stage?.responses?.messages && Array.isArray(stageData.stage.responses.messages)) {
+        if (fetchedStageData.stage?.responses?.messages && Array.isArray(fetchedStageData.stage.responses.messages)) {
           // Restore saved conversation
-          setMessages(stageData.stage.responses.messages);
-        } else {
-          // Initialize with agent greeting (new conversation)
+          setMessages(fetchedStageData.stage.responses.messages);
+        } else if (!isReviewMode) {
+          // Only initialize with agent greeting if NOT in review mode (new conversation)
           let greeting = generateAgentGreeting(
             stageConfig.agentType,
             currentProject?.name
@@ -256,7 +279,7 @@ export default function StagePage() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || sending) return;
+    if (!input.trim() || sending || isReviewMode) return;
 
     const userMessage = input.trim();
     setInput("");
@@ -519,13 +542,20 @@ export default function StagePage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push(isReviewMode ? `/projects/${projectId}/prd` : "/dashboard")}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Dashboard
+                {isReviewMode ? "Back to PRD" : "Dashboard"}
               </Button>
               <div>
-                <h1 className="text-xl font-semibold">{project?.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold">{project?.name}</h1>
+                  {isReviewMode && (
+                    <span className="text-xs font-medium px-2 py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      (Review Mode)
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Stage {stageNumber}: {stageConfig.name}
                 </p>
@@ -536,13 +566,19 @@ export default function StagePage() {
                 <Sparkles className={`h-5 w-5 text-${stageConfig.color}-500`} />
                 <span className="text-sm font-medium">{stageConfig.agentName}</span>
               </div>
-              {autoSaving && (
+              {isReviewMode && (
+                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
+                  <Eye className="h-3 w-3" />
+                  <span>Read Only</span>
+                </div>
+              )}
+              {!isReviewMode && autoSaving && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   <span>Saving...</span>
                 </div>
               )}
-              {!autoSaving && messages.length > 1 && (
+              {!isReviewMode && !autoSaving && messages.length > 1 && (
                 <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
                   <Check className="h-3 w-3" />
                   <span>Saved</span>
@@ -562,52 +598,59 @@ export default function StagePage() {
               { number: 1, name: "Requirements" },
               { number: 2, name: "Architecture" },
               { number: 3, name: "UI/UX" },
-            ].map((stage) => (
-              <div key={stage.number} className="flex items-center">
-                <button
-                  onClick={() => {
-                    if (stage.number < stageNumber) {
-                      // Allow navigation to completed stages
-                      router.push(`/projects/${projectId}/stage/${stage.number}`);
-                    }
-                  }}
-                  disabled={stage.number >= stageNumber}
-                  className={`flex flex-col items-center ${
-                    stage.number < stageNumber ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
-                  }`}
-                >
-                  <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                      stage.number === stageNumber
-                        ? "border-foreground bg-foreground text-background"
-                        : stage.number < stageNumber
-                        ? "border-green-500 bg-green-500 text-white"
-                        : "border-border bg-background text-muted-foreground"
+            ].map((stage) => {
+              // In review mode, allow clicking any completed stage
+              // In normal mode, only allow clicking previous stages
+              const isClickable = isReviewMode
+                ? stageData && stage.number !== stageNumber
+                : stage.number < stageNumber;
+
+              return (
+                <div key={stage.number} className="flex items-center">
+                  <button
+                    onClick={() => {
+                      if (isClickable) {
+                        router.push(`/projects/${projectId}/stage/${stage.number}`);
+                      }
+                    }}
+                    disabled={!isClickable}
+                    className={`flex flex-col items-center ${
+                      isClickable ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
                     }`}
                   >
-                    {stage.number}
-                  </div>
-                  <span
-                    className={`text-xs mt-1 ${
-                      stage.number === stageNumber
-                        ? "text-foreground font-medium"
-                        : stage.number < stageNumber
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {stage.name}
-                  </span>
-                </button>
-                {stage.number < 3 && (
-                  <div
-                    className={`w-16 h-0.5 mb-5 ${
-                      stage.number < stageNumber ? "bg-green-500" : "bg-border"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                        stage.number === stageNumber
+                          ? "border-foreground bg-foreground text-background"
+                          : stage.number < stageNumber || (isReviewMode && stageData)
+                          ? "border-green-500 bg-green-500 text-white"
+                          : "border-border bg-background text-muted-foreground"
+                      }`}
+                    >
+                      {stage.number}
+                    </div>
+                    <span
+                      className={`text-xs mt-1 ${
+                        stage.number === stageNumber
+                          ? "text-foreground font-medium"
+                          : stage.number < stageNumber || (isReviewMode && stageData)
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {stage.name}
+                    </span>
+                  </button>
+                  {stage.number < 3 && (
+                    <div
+                      className={`w-16 h-0.5 mb-5 ${
+                        stage.number < stageNumber || (isReviewMode && stageData) ? "bg-green-500" : "bg-border"
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -616,6 +659,21 @@ export default function StagePage() {
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto px-4 py-6 max-w-4xl">
           <div className="space-y-6">
+            {/* Show stage summary at top when in review mode */}
+            {isReviewMode && stageSummary && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                    Stage Summary
+                  </h3>
+                </div>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-blue-900 dark:text-blue-100">
+                  <div className="whitespace-pre-wrap">{stageSummary}</div>
+                </div>
+              </div>
+            )}
+
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -649,81 +707,116 @@ export default function StagePage() {
       {/* Input */}
       <div className="border-t border-border bg-background">
         <div className="container mx-auto px-4 py-4 max-w-4xl space-y-3">
-          <div className="flex gap-2">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={`Message ${stageConfig.agentName}...`}
-              rows={1}
-              className="flex-1 px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none overflow-hidden min-h-[42px] max-h-[200px]"
-              disabled={sending || streaming}
-              style={{ height: "auto" }}
-            />
-            <Button
-              onClick={sendMessage}
-              disabled={!input.trim() || sending || streaming}
-              size="lg"
-            >
-              {sending || streaming ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-            {messages.length >= 3 && (
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const minMessages = { 1: 10, 2: 8, 3: 8 };
-                  const required = minMessages[stageNumber as keyof typeof minMessages];
-                  const current = Math.floor((messages.length - 1) / 2);
-                  const target = Math.ceil(required / 2);
-                  const isReady = messages.length >= required;
+          {isReviewMode ? (
+            /* Review Mode Navigation */
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/projects/${projectId}/prd`)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to PRD
+              </Button>
 
-                  return (
-                    <>
-                      <span className={`text-xs ${isReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                        {current}/{target} exchanges
-                      </span>
-                      <Button
-                        onClick={requestStageSummary}
-                        disabled={completing || sending || streaming}
-                        variant={isReady ? "default" : "outline"}
-                        size="sm"
-                      >
-                        {completing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            {stageNumber < 3 ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/projects/${projectId}/stage/${stageNumber - 1}`)}
+                  disabled={stageNumber === 1}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous Stage
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/projects/${projectId}/stage/${stageNumber + 1}`)}
+                  disabled={stageNumber === 3}
+                >
+                  Next Stage
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Normal Mode Input */
+            <>
+              <div className="flex gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={`Message ${stageConfig.agentName}...`}
+                  rows={1}
+                  className="flex-1 px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none overflow-hidden min-h-[42px] max-h-[200px]"
+                  disabled={sending || streaming}
+                  style={{ height: "auto" }}
+                />
+                <Button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || sending || streaming}
+                  size="lg"
+                >
+                  {sending || streaming ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Press Enter to send, Shift+Enter for new line
+                </p>
+                {messages.length >= 3 && (
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const minMessages = { 1: 10, 2: 8, 3: 8 };
+                      const required = minMessages[stageNumber as keyof typeof minMessages];
+                      const current = Math.floor((messages.length - 1) / 2);
+                      const target = Math.ceil(required / 2);
+                      const isReady = messages.length >= required;
+
+                      return (
+                        <>
+                          <span className={`text-xs ${isReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                            {current}/{target} exchanges
+                          </span>
+                          <Button
+                            onClick={requestStageSummary}
+                            disabled={completing || sending || streaming}
+                            variant={isReady ? "default" : "outline"}
+                            size="sm"
+                          >
+                            {completing ? (
                               <>
-                                Complete & Continue to Stage {stageNumber + 1}
-                                <ArrowRight className="h-4 w-4 ml-2" />
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Saving...
                               </>
                             ) : (
                               <>
-                                Complete & Generate PRD
-                                <ArrowRight className="h-4 w-4 ml-2" />
+                                {stageNumber < 3 ? (
+                                  <>
+                                    Complete & Continue to Stage {stageNumber + 1}
+                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Complete & Generate PRD
+                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                  </>
+                                )}
                               </>
                             )}
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  );
-                })()}
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
