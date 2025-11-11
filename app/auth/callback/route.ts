@@ -3,8 +3,9 @@
  * Handles OAuth and magic link callbacks from Supabase
  */
 
-import { createClient } from "@/lib/supabase/server-route";
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url);
@@ -15,30 +16,45 @@ export async function GET(req: NextRequest) {
 
   if (code) {
     try {
-      // Create a Supabase client with proper cookie handling
-      const supabase = await createClient();
+      const cookieStore = await cookies();
+
+      // Create response that we'll attach cookies to
+      const response = NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
+
+      // Create Supabase client that will set cookies on the response
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll(cookiesToSet) {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                console.log("Setting cookie on response:", name);
+                response.cookies.set(name, value, options);
+              });
+            },
+          },
+        }
+      );
 
       console.log("Auth callback - Exchanging code for session...");
 
-      // Exchange the code for a session
+      // Exchange the code for a session - this will trigger setAll above
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (error) {
         console.error("Auth callback error:", error);
-        // Redirect to login with error
         return NextResponse.redirect(new URL("/auth/login?error=auth_error", requestUrl.origin));
       }
 
       console.log("Auth callback - Session established:", !!data.session);
       console.log("Auth callback - User ID:", data.session?.user?.id);
 
-      // Verify the session is actually set
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("Auth callback - Session verification:", !!session);
-
-      // Redirect to dashboard after successful authentication
-      // The session cookies are automatically handled by the Supabase SSR client
-      return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
+      // Return the response with cookies attached
+      return response;
     } catch (err) {
       console.error("Auth callback exception:", err);
       return NextResponse.redirect(new URL("/auth/login?error=exception", requestUrl.origin));
@@ -46,6 +62,5 @@ export async function GET(req: NextRequest) {
   }
 
   console.log("Auth callback - No code provided, redirecting to login");
-  // If no code, redirect to login
   return NextResponse.redirect(new URL("/auth/login", requestUrl.origin));
 }
