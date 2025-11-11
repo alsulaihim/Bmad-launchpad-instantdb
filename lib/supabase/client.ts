@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 // Validate environment variables at build time
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -12,14 +12,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 /**
  * Supabase client for client-side operations
- * Uses the anon key which has RLS (Row Level Security) policies applied
- * @see https://supabase.com/docs/guides/auth/row-level-security
+ * Uses SSR package to read auth from cookies (set by server-side auth callback)
+ * This ensures auth state is shared between server and client
+ * @see https://supabase.com/docs/guides/auth/server-side/nextjs
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
