@@ -45,19 +45,37 @@ export default function DashboardPage() {
   }, []);
 
   const checkAuthAndApiKey = async () => {
+    console.log("Dashboard - Checking auth...");
+
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
+    console.log("Dashboard - getUser result:", {
+      user: !!user,
+      userId: user?.id,
+      email: user?.email,
+      error: userError
+    });
+
     if (!user) {
+      console.log("Dashboard - No user found, redirecting to login");
       router.push("/auth/login");
       return;
     }
+
+    console.log("Dashboard - User authenticated:", user.email);
 
     // Check if user has API key
     const {
       data: { session },
     } = await supabase.auth.getSession();
+
+    console.log("Dashboard - Session:", {
+      hasSession: !!session,
+      accessToken: session?.access_token?.substring(0, 20) + "..."
+    });
 
     if (session) {
       try {
