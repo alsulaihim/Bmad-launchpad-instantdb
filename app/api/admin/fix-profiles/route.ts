@@ -45,7 +45,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const existingProfileIds = new Set(profiles?.map(p => p.id) || []);
+    type ProfileData = { id: string }[] | null;
+    const typedProfiles = profiles as ProfileData;
+    const existingProfileIds = new Set(typedProfiles?.map(p => p.id) || []);
 
     // Find users without profiles
     const usersWithoutProfiles = users.filter(user => !existingProfileIds.has(user.id));
