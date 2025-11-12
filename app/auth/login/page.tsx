@@ -5,8 +5,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -15,12 +15,29 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showResendConfirmation, setShowResendConfirmation] = useState(false);
+
+  // Check for error or message in URL params
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    const urlMessage = searchParams.get('message');
+
+    if (urlMessage === 'account_created') {
+      setMessage('✅ Account created successfully! Please use the "Send Magic Link" option below to sign in to your new account.');
+    } else if (urlError === 'magic_link_cross_browser') {
+      setError('⚠️ Magic links must be opened in the same browser where they were requested. Please use password authentication or request a new magic link from this browser.');
+    } else if (urlError === 'expired_link') {
+      setError('This magic link has expired. Please request a new one or use password authentication.');
+    } else if (urlError) {
+      setError(decodeURIComponent(urlError));
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

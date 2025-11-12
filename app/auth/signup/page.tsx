@@ -6,6 +6,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -13,6 +14,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -33,27 +35,40 @@ export default function SignupPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
+      // Use the server-side API route for signup
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+        }),
       });
 
-      if (error) {
-        setError(error.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to create account");
         return;
       }
 
-      if (data.user) {
-        setMessage(
-          "✅ Account created! Check your email inbox (and spam folder) for a confirmation link. You can also use the Magic Link option to sign in without waiting for confirmation."
-        );
-        // Don't auto-redirect, let user read the message
+      if (data.success) {
+        setMessage(`✅ ${data.message}`);
+
+        if (data.requiresMagicLink) {
+          // Redirect to login page after a delay
+          setTimeout(() => {
+            router.push('/auth/login?message=account_created');
+          }, 3000);
+        } else {
+          // Successfully logged in, redirect to dashboard
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 1000);
+        }
       }
     } catch {
       setError("An unexpected error occurred");
