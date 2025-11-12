@@ -28,7 +28,14 @@
       "Bash(supabase inspect db calls:*)",
       "Bash(npx supabase inspect db --help:*)",
       "Bash(dig:*)",
-      "Bash(node test-auth-flow.js:*)"
+      "Bash(node test-auth-flow.js:*)",
+      "Bash(node:*)",
+      "Bash(while read line)",
+      "Bash(do export \"$line\")",
+      "Bash(done)",
+      "Bash(set -a)",
+      "Bash(source:*)",
+      "Bash(set +a)"
     ],
     "deny": [],
     "ask": []
