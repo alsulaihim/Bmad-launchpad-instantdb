@@ -62,24 +62,54 @@ export async function POST(req: NextRequest) {
     // Encrypt the API key
     const encryptedKey = encrypt(apiKey);
 
-    // Update user profile
-    const { error: updateError } = await supabase
+    // First, ensure profile exists
+    const { data: existingProfile } = await supabase
       .from("profiles")
-      .update({
-        anthropic_api_key: encryptedKey,
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", user.id);
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    if (updateError) {
-      logger.error("Failed to save API key", {
-        error: updateError,
-        userId: user.id,
-      });
-      return NextResponse.json(
-        { error: "Failed to save API key" },
-        { status: 500 }
-      );
+    if (!existingProfile) {
+      // Create profile if it doesn't exist
+      const { error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || null,
+          anthropic_api_key: encryptedKey,
+        } as never);
+
+      if (createError) {
+        logger.error("Failed to create profile with API key", {
+          error: createError,
+          userId: user.id,
+        });
+        return NextResponse.json(
+          { error: "Failed to save API key" },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Update existing profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          anthropic_api_key: encryptedKey,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", user.id);
+
+      if (updateError) {
+        logger.error("Failed to save API key", {
+          error: updateError,
+          userId: user.id,
+        });
+        return NextResponse.json(
+          { error: "Failed to save API key" },
+          { status: 500 }
+        );
+      }
     }
 
     logger.info("API key saved successfully", { userId: user.id });
@@ -130,10 +160,33 @@ export async function GET(req: NextRequest) {
       .from("profiles")
       .select("anthropic_api_key")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     type ProfileData = { anthropic_api_key: string | null } | null;
     const typedProfile = profile as ProfileData;
+
+    // If profile doesn't exist, create it
+    if (!profile) {
+      const { error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || null,
+        } as never);
+
+      if (createError) {
+        logger.error("Failed to create profile", {
+          error: createError,
+          userId: user.id,
+        });
+      }
+
+      // Profile was just created, so no API key yet
+      return NextResponse.json({
+        hasApiKey: false,
+      });
+    }
 
     if (error) {
       logger.error("Failed to fetch API key status", {
