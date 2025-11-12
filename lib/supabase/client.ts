@@ -12,9 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 /**
  * Supabase client for client-side operations
- * Uses SSR package to read auth from cookies (set by server-side auth callback)
- * This ensures auth state is shared between server and client
+ * Uses SSR package with cookie-based auth
  * @see https://supabase.com/docs/guides/auth/server-side/nextjs
  */
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
-

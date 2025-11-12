@@ -25,7 +25,10 @@
       "Bash(git restore:*)",
       "Bash(cat:*)",
       "Bash(npm view:*)",
-      "Bash(supabase inspect db calls:*)"
+      "Bash(supabase inspect db calls:*)",
+      "Bash(npx supabase inspect db --help:*)",
+      "Bash(dig:*)",
+      "Bash(node test-auth-flow.js:*)"
     ],
     "deny": [],
     "ask": []
