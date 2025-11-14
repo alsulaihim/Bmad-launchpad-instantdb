@@ -39,7 +39,8 @@
       "Bash(xargs:*)",
       "Bash(npm install:*)",
       "Bash(npm outdated:*)",
-      "Bash(supabase db push:*)"
+      "Bash(supabase db push:*)",
+      "Bash(supabase db execute:*)"
     ],
     "deny": [],
     "ask": []

@@ -71,22 +71,33 @@ export async function POST(req: NextRequest) {
 
     if (!existingProfile) {
       // Create profile if it doesn't exist
+      // Ensure we have an email
+      const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
+
       const { error: createError } = await supabase
         .from("profiles")
         .insert({
           id: user.id,
-          email: user.email,
+          email: email,
           full_name: user.user_metadata?.full_name || null,
           anthropic_api_key: encryptedKey,
         } as never);
 
       if (createError) {
-        logger.error("Failed to create profile with API key", {
+        logger.error("Failed to create profile with API key in POST", {
           error: createError,
+          errorMessage: createError.message,
+          errorDetails: createError.details,
+          errorHint: createError.hint,
           userId: user.id,
+          email: email,
         });
         return NextResponse.json(
-          { error: "Failed to save API key" },
+          {
+            error: "Failed to save API key",
+            details: createError.message,
+            hint: createError.hint,
+          },
           { status: 500 }
         );
       }
@@ -167,19 +178,33 @@ export async function GET(req: NextRequest) {
 
     // If profile doesn't exist, create it
     if (!profile) {
+      // Ensure we have an email
+      const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
+
       const { error: createError } = await supabase
         .from("profiles")
         .insert({
           id: user.id,
-          email: user.email,
+          email: email,
           full_name: user.user_metadata?.full_name || null,
         } as never);
 
       if (createError) {
-        logger.error("Failed to create profile", {
+        logger.error("Failed to create profile in GET", {
           error: createError,
+          errorMessage: createError.message,
+          errorDetails: createError.details,
+          errorHint: createError.hint,
           userId: user.id,
+          email: email,
         });
+
+        // Return error details for debugging
+        return NextResponse.json({
+          error: "Failed to create profile",
+          details: createError.message,
+          hint: createError.hint,
+        }, { status: 500 });
       }
 
       // Profile was just created, so no API key yet
