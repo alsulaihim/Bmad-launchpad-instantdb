@@ -35,7 +35,10 @@
       "Bash(done)",
       "Bash(set -a)",
       "Bash(source:*)",
-      "Bash(set +a)"
+      "Bash(set +a)",
+      "Bash(xargs:*)",
+      "Bash(npm install:*)",
+      "Bash(npm outdated:*)"
     ],
     "deny": [],
     "ask": []
