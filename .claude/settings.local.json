@@ -38,7 +38,8 @@
       "Bash(set +a)",
       "Bash(xargs:*)",
       "Bash(npm install:*)",
-      "Bash(npm outdated:*)"
+      "Bash(npm outdated:*)",
+      "Bash(supabase db push:*)"
     ],
     "deny": [],
     "ask": []
