@@ -40,7 +40,10 @@
       "Bash(npm install:*)",
       "Bash(npm outdated:*)",
       "Bash(supabase db push:*)",
-      "Bash(supabase db execute:*)"
+      "Bash(supabase db execute:*)",
+      "Bash(supabase db pull:*)",
+      "Bash(supabase migration repair:*)",
+      "Bash(supabase status:*)"
     ],
     "deny": [],
     "ask": []

@@ -24,18 +24,15 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
 
+    // Create admin client with service role key (bypasses RLS)
+    const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey);
+
+    // Verify the user's identity using their token
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token);
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -62,8 +59,8 @@ export async function POST(req: NextRequest) {
     // Encrypt the API key
     const encryptedKey = encrypt(apiKey);
 
-    // First, ensure profile exists
-    const { data: existingProfile } = await supabase
+    // First, ensure profile exists (using admin client)
+    const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("id", user.id)
@@ -74,7 +71,7 @@ export async function POST(req: NextRequest) {
       // Ensure we have an email
       const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
 
-      const { error: createError } = await supabase
+      const { error: createError } = await supabaseAdmin
         .from("profiles")
         .insert({
           id: user.id,
@@ -103,7 +100,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Update existing profile
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({
           anthropic_api_key: encryptedKey,
@@ -150,24 +147,21 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
 
+    // Create admin client with service role key (bypasses RLS)
+    const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey);
+
+    // Verify the user's identity using their token
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token);
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: profile, error } = await supabase
+    const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .select("anthropic_api_key")
       .eq("id", user.id)
@@ -181,7 +175,7 @@ export async function GET(req: NextRequest) {
       // Ensure we have an email
       const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
 
-      const { error: createError } = await supabase
+      const { error: createError } = await supabaseAdmin
         .from("profiles")
         .insert({
           id: user.id,
