@@ -45,7 +45,7 @@ npm install
 
 ### 3. Environment Variables
 
-Copy the example environment file and fill in your Supabase credentials:
+Copy the example environment file and fill in your InstantDB credentials:
 
 ```bash
 cp .env.example .env.local
@@ -54,13 +54,12 @@ cp .env.example .env.local
 Edit `.env.local` with your values:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+NEXT_PUBLIC_INSTANTDB_APP_ID=your_instantdb_app_id
+INSTANTDB_ADMIN_TOKEN=your_instantdb_admin_token
 NEXT_PUBLIC_APP_URL=http://localhost:3050
 ```
 
-**⚠️ Security Note**: Never commit `.env.local` to version control. The service role key should only be used server-side.
+**⚠️ Security Note**: Never commit `.env.local` to version control. The admin token should only be used server-side.
 
 ### 4. Run Development Server
 
@@ -108,7 +107,7 @@ This project implements OWASP ASVS security controls:
 
 - `development` - Active development branch (default)
 - `staging` - Pre-production testing
-- `production` - Production-ready code
+- `live` - Production-ready code
 
 ### Commit Convention
 

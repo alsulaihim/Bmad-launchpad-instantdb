@@ -1,7 +1,8 @@
+import winston from "winston";
+
 /**
  * Centralized logging utility
- * Provides structured logging with different levels
- * In production, integrate with logging service (e.g., Winston, Pino)
+ * Provides structured logging with different levels using Winston
  */
 
 type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
@@ -11,13 +12,30 @@ interface LogContext {
   correlationId?: string;
 }
 
+// Define custom levels if needed, but standard npm levels are fine.
+// Winston levels: error: 0, warn: 1, info: 2, http: 3, verbose: 4, debug: 5, silly: 6
+// We map:
+// fatal -> error (with metadata)
+// error -> error
+// warn -> warn
+// info -> info
+// debug -> debug
+// trace -> silly
+
+const winstonLogger = winston.createLogger({
+  level: process.env.NODE_ENV === "production" ? "info" : "debug",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [new winston.transports.Console()],
+});
+
 /**
  * Logger class for structured logging
  * Redacts sensitive information and provides context
  */
 class Logger {
-  private isDevelopment = process.env.NODE_ENV === "development";
-
   /**
    * Redacts sensitive information from log context
    * Add patterns for PII, secrets, tokens, etc.
@@ -48,36 +66,35 @@ class Logger {
    * Core log method
    */
   private log(level: LogLevel, message: string, context?: LogContext) {
-    const timestamp = new Date().toISOString();
     const sanitizedContext = context
       ? this.redactSensitiveData(context)
       : undefined;
 
-    const logEntry = {
-      timestamp,
-      level,
-      message,
+    const meta = {
       ...(sanitizedContext && { context: sanitizedContext }),
     };
 
-    // In development, use console methods for better DX
-    if (this.isDevelopment) {
-      switch (level) {
-        case "error":
-        case "fatal":
-          console.error(JSON.stringify(logEntry, null, 2));
-          break;
-        case "warn":
-          console.warn(JSON.stringify(logEntry, null, 2));
-          break;
-        default:
-          // eslint-disable-next-line no-console
-          console.log(JSON.stringify(logEntry, null, 2));
-      }
-    } else {
-      // In production, use structured JSON logging
-      // eslint-disable-next-line no-console
-      console.log(JSON.stringify(logEntry));
+    switch (level) {
+      case "fatal":
+        winstonLogger.error(message, { ...meta, fatal: true });
+        break;
+      case "error":
+        winstonLogger.error(message, meta);
+        break;
+      case "warn":
+        winstonLogger.warn(message, meta);
+        break;
+      case "info":
+        winstonLogger.info(message, meta);
+        break;
+      case "debug":
+        winstonLogger.debug(message, meta);
+        break;
+      case "trace":
+        winstonLogger.silly(message, meta);
+        break;
+      default:
+        winstonLogger.info(message, meta);
     }
   }
 
@@ -130,4 +147,3 @@ class Logger {
 
 // Export singleton instance
 export const logger = new Logger();
-
