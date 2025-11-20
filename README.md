@@ -17,16 +17,16 @@ At completion, users receive a comprehensive Product Requirements Document (PRD)
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript 5
 - **Styling**: Tailwind CSS 3.4 with Shadcn/ui components
-- **Database**: Supabase (PostgreSQL)
+- **Database**: InstantDB (Real-time & Auth)
 - **Theme**: next-themes for light/dark mode (system preference default)
 - **Icons**: Lucide React
-- **Deployment**: Railway (planned)
+- **Deployment**: Vercel (Development, Staging, Production)
 
 ## 📋 Prerequisites
 
 - Node.js 18.17 or higher
 - npm or yarn package manager
-- Supabase account (for database features)
+- InstantDB account (for database and auth features)
 
 ## 🚀 Getting Started
 
@@ -48,7 +48,7 @@ npm install
 Copy the example environment file and fill in your InstantDB credentials:
 
 ```bash
-cp .env.example .env.local
+cp env.template .env.local
 ```
 
 Edit `.env.local` with your values:
@@ -82,13 +82,15 @@ Open [http://localhost:3050](http://localhost:3050) in your browser.
 │   ├── theme-provider.tsx # Theme context provider
 │   └── theme-toggle.tsx   # Theme switcher component
 ├── lib/                   # Utility libraries
-│   ├── supabase/         # Supabase client configuration
-│   │   ├── client.ts     # Client-side Supabase instance
-│   │   └── server.ts     # Server-side Supabase instance
+│   ├── instantdb/        # InstantDB client configuration
+│   │   ├── client.ts     # Client-side InstantDB instance
+│   │   ├── admin.ts      # Server-side InstantDB admin instance
+│   │   └── schema.ts     # Database schema
 │   ├── logger.ts         # Centralized logging utility
 │   └── utils.ts          # Helper functions
 ├── middleware.ts          # Security headers and request handling
-└── next.config.ts         # Next.js configuration
+├── next.config.ts         # Next.js configuration
+└── vercel.json            # Vercel deployment configuration
 ```
 
 ## 🔒 Security Features
@@ -98,7 +100,7 @@ This project implements OWASP ASVS security controls:
 - **Security Headers**: CSP, X-Frame-Options, HSTS (production), etc.
 - **Environment Variable Validation**: Runtime checks for required config
 - **Sensitive Data Redaction**: Automatic PII/secret filtering in logs
-- **Row Level Security**: Supabase RLS policies (to be configured)
+- **InstantDB Permissions**: Rules-based access control (to be configured in InstantDB dashboard)
 - **TypeScript Strict Mode**: Type safety and compile-time error checking
 
 ## 📝 Development Workflow
@@ -138,26 +140,24 @@ npm run lint
 npx tsc --noEmit
 ```
 
-## 🚢 Deployment
+## ship Deployment
 
-### Railway Deployment
+### Vercel Deployment
 
-This project is configured for Railway deployment:
+This project is configured for Vercel deployment with three environments:
 
-1. Connect your GitHub repository to Railway
-2. Set environment variables in Railway dashboard
-3. Railway will auto-detect Next.js and configure build settings
-4. Deploy from the `production` branch
+1. **Development** (from `development` branch)
+2. **Staging** (from `staging` branch)
+3. **Production** (from `live` branch)
 
-### Environment Variables (Railway)
+### Environment Variables (Vercel)
 
-Set these in your Railway project:
+Set these in your Vercel project settings for each environment:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_APP_URL` (your Railway domain)
-- `NODE_ENV=production`
+- `NEXT_PUBLIC_INSTANTDB_APP_ID`
+- `INSTANTDB_ADMIN_TOKEN` (Server-side only)
+- `NEXT_PUBLIC_APP_URL` (Your Vercel deployment URL)
+- `ENCRYPTION_KEY` (32-char string for sensitive data encryption)
 
 ## 🎨 Customization
 
@@ -184,7 +184,7 @@ npx shadcn-ui@latest add <component-name>
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Shadcn/ui](https://ui.shadcn.com)
-- [Supabase](https://supabase.com/docs)
+- [InstantDB](https://instantdb.com/docs)
 
 ## 🐛 Known Issues
 
@@ -208,4 +208,3 @@ For issues or questions, please create an issue in the GitHub repository.
 ---
 
 Built with the BMAD Framework | © 2025 Vibe Coding Launchpad
-

@@ -4,12 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { id } from "@instantdb/admin";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 /**
  * GET /api/projects
@@ -23,38 +20,31 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fetch user's projects
-    const { data: projects, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    // Query projects where owner.id matches user.id
+    const queryResult = await dbAdmin.query({
+      projects: {
+        $: {
+          where: { "owner.id": user.id },
+          order: { created_at: "desc" } // InstantDB sort syntax might differ, checking...
+          // InstantQL doesn't support server-side sort in 'query' effectively yet? 
+          // Actually it does via sort key or client side. 
+          // For now, let's just fetch and sort in memory if needed, or assume basic order.
+        } 
+      }
+    });
 
-    if (error) {
-      logger.error("Error fetching projects", { error, userId: user.id });
-      return NextResponse.json(
-        { error: "Failed to fetch projects" },
-        { status: 500 }
-      );
-    }
+    const projects = queryResult.projects || [];
+    // Sort in memory if needed
+    projects.sort((a: any, b: any) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
     return NextResponse.json({ projects });
   } catch (error) {
@@ -78,21 +68,9 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -106,58 +84,65 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create project
-    const { data: project, error } = await supabase
-      .from("projects")
-      .insert({
-        user_id: user.id,
-        name,
-        description: description || null,
-        status: "in_progress",
-        current_stage: 1,
-      } as never)
-      .select()
-      .single();
+    const projectId = id();
+    const now = new Date().toISOString();
 
-    type ProjectData = { id: string; [key: string]: unknown } | null;
-    const typedProject = project as ProjectData;
-
-    if (error || !typedProject) {
-      logger.error("Error creating project", { error, userId: user.id });
-      return NextResponse.json(
-        { error: "Failed to create project" },
-        { status: 500 }
-      );
-    }
-
-    // Create initial stage entries
-    const stages = [
+    // Create project and link to user (profile)
+    // We assume profile exists with ID = user.id (ensured by check-profile or login flow)
+    
+    // Create stages
+    const stagesData = [
       { stage_number: 1, stage_name: "Brainstorming & Requirements" },
       { stage_number: 2, stage_name: "Tech Stack & Architecture" },
       { stage_number: 3, stage_name: "UI/UX Design" },
     ];
 
-    const { error: stagesError } = await supabase.from("project_stages").insert(
-      stages.map((stage) => ({
-        project_id: typedProject.id,
-        stage_number: stage.stage_number,
-        stage_name: stage.stage_name,
-        responses: {},
-        completed: false,
-      })) as never
+    const txSteps = [];
+
+    // Create Project
+    txSteps.push(
+      dbAdmin.tx.projects[projectId].update({
+        name,
+        description: description || "",
+        status: "in_progress",
+        current_stage: 1,
+        created_at: now,
+        updated_at: now,
+      }).link({ owner: user.id })
     );
 
-    if (stagesError) {
-      logger.error("Error creating project stages", {
-        error: stagesError,
-        projectId: typedProject.id,
-      });
-      // Don't fail the request, stages can be created later
-    }
+    // Create Stages
+    stagesData.forEach(stage => {
+      const stageId = id();
+      txSteps.push(
+        dbAdmin.tx.project_stages[stageId].update({
+          stage_number: stage.stage_number,
+          stage_name: stage.stage_name,
+          responses: {}, // Empty JSON
+          completed: false,
+          created_at: now,
+          updated_at: now,
+        }).link({ project: projectId }) // Link to project using 'project' label (reverse of stages)
+        // Check schema: stageProject -> forward on project_stages has "project" label. Correct.
+      );
+    });
 
-    logger.info("Project created", { projectId: typedProject.id, userId: user.id });
+    await dbAdmin.transact(txSteps);
 
-    return NextResponse.json({ project: typedProject }, { status: 201 });
+    const project = {
+      id: projectId,
+      name,
+      description: description || "",
+      status: "in_progress",
+      current_stage: 1,
+      created_at: now,
+      updated_at: now,
+      user_id: user.id // mimic Supabase response
+    };
+
+    logger.info("Project created", { projectId, userId: user.id });
+
+    return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     logger.error("Error in POST /api/projects", { error });
     return NextResponse.json(

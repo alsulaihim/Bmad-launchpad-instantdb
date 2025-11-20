@@ -9,19 +9,13 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   return NextResponse.json({
-    supabaseUrl: {
-      set: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      value: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "...",
+    instantdbAppId: {
+      set: !!process.env.NEXT_PUBLIC_INSTANTDB_APP_ID,
+      value: process.env.NEXT_PUBLIC_INSTANTDB_APP_ID ? "Set" : "Not Set",
     },
-    supabaseAnonKey: {
-      set: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      length: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length || 0,
-      prefix: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + "...",
-    },
-    supabaseServiceKey: {
-      set: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      length: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
-      prefix: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20) + "...",
+    instantdbAdminToken: {
+      set: !!process.env.INSTANTDB_ADMIN_TOKEN,
+      value: process.env.INSTANTDB_ADMIN_TOKEN ? "Set" : "Not Set",
     },
     encryptionKey: {
       set: !!process.env.ENCRYPTION_KEY,

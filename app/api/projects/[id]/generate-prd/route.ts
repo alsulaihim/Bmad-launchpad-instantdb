@@ -4,14 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import { createClaudeClient } from "@/lib/services/claude.service";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { id } from "@instantdb/admin";
 
 interface RouteContext {
   params: Promise<{
@@ -37,20 +34,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -59,56 +45,58 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const { stages } = body as { stages: StageData[] };
 
     // Verify project ownership
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .eq("user_id", user.id)
-      .single();
+    const projectQuery = await dbAdmin.query({
+      projects: {
+        $: {
+          where: {
+            id: projectId,
+            "owner.id": user.id
+          }
+        }
+      }
+    });
 
-    type ProjectData = { name: string; description?: string } | null;
-    const typedProject = project as ProjectData;
+    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
 
-    if (projectError || !typedProject) {
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Check if PRD already exists
-    const { data: existingPrd } = await supabase
-      .from("prd_documents")
-      .select("content")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const prdQuery = await dbAdmin.query({
+      prd_documents: {
+        $: {
+          where: { "project.id": projectId }
+        }
+      }
+    });
+    
+    // Assuming we want the latest if multiple exist (though usually 1-1)
+    const existingPrd = prdQuery.prd_documents && prdQuery.prd_documents.length > 0 ? prdQuery.prd_documents[0] : null;
 
-    type PrdData = { content: string } | null;
-    const typedExistingPrd = existingPrd as PrdData;
-
-    if (typedExistingPrd && typedExistingPrd.content) {
+    if (existingPrd && existingPrd.content) {
       // PRD already exists, return it without regenerating
       logger.info("PRD already exists, returning cached version", { projectId });
-      return NextResponse.json({ prd: typedExistingPrd.content });
+      return NextResponse.json({ prd: existingPrd.content });
     }
 
     // Get user's encrypted API key
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("anthropic_api_key")
-      .eq("id", user.id)
-      .single();
+    const profileQuery = await dbAdmin.query({
+      profiles: {
+        $: { where: { id: user.id } }
+      }
+    });
 
-    type ProfileData = { anthropic_api_key: string | null } | null;
-    const typedProfile = profile as ProfileData;
+    const profile = profileQuery.profiles && profileQuery.profiles.length > 0 ? profileQuery.profiles[0] : null;
 
-    if (profileError || !typedProfile || !typedProfile.anthropic_api_key) {
+    if (!profile || !profile.anthropic_api_key) {
       return NextResponse.json(
         { error: "Anthropic API key not found" },
         { status: 400 }
       );
     }
 
-    const apiKey = decrypt(typedProfile.anthropic_api_key);
+    const apiKey = decrypt(profile.anthropic_api_key);
     const client = createClaudeClient(apiKey);
 
     // Extract conversation content from all stages
@@ -136,8 +124,8 @@ Format the PRD in clear, professional Markdown. Be specific and actionable.`;
 
     const userPrompt = `Generate a comprehensive Product Requirements Document for the following project:
 
-**Project Name:** ${typedProject.name}
-**Description:** ${typedProject.description || "N/A"}
+**Project Name:** ${project.name}
+**Description:** ${project.description || "N/A"}
 
 ---
 
@@ -163,7 +151,7 @@ Based on these three comprehensive discussions, create a professional PRD that c
 
     // Call Claude to generate PRD
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 8000,
       messages: [
         {
@@ -177,21 +165,26 @@ Based on these three comprehensive discussions, create a professional PRD that c
     const prdContent =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Save PRD to database
-    const { error: prdError } = await supabase.from("prd_documents").insert({
-      project_id: projectId,
-      content: prdContent,
-    } as never);
+    // Save PRD to database and update project status
+    const prdId = id();
+    const now = new Date().toISOString();
 
-    if (prdError) {
-      logger.error("Failed to save PRD", { error: prdError, projectId });
-    }
-
-    // Mark project as completed
-    await supabase
-      .from("projects")
-      .update({ status: "completed" } as never)
-      .eq("id", projectId);
+    await dbAdmin.transact([
+      // Create PRD
+      dbAdmin.tx.prd_documents[prdId].update({
+        content: prdContent,
+        format: "markdown",
+        version: 1,
+        created_at: now,
+        updated_at: now,
+      }).link({ project: projectId }),
+      
+      // Update Project Status
+      dbAdmin.tx.projects[projectId].update({
+        status: "completed",
+        updated_at: now
+      })
+    ]);
 
     logger.info("PRD generated successfully", { projectId });
 

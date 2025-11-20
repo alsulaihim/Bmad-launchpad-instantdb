@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { db } from "@/lib/instantdb/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2, Send, Sparkles, Check, Eye } from "lucide-react";
 import { generateAgentGreeting } from "@/lib/services/claude.service";
@@ -60,6 +60,7 @@ export default function StagePage() {
   const projectId = params.id as string;
   const stageNumber = parseInt(params.stageNumber as string);
 
+  const { isLoading: authLoading, user } = db.useAuth();
   const [project, setProject] = useState<ProjectData | null>(null);
   const [stageData, setStageData] = useState<StageData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -80,9 +81,13 @@ export default function StagePage() {
   const stageConfig = STAGE_CONFIG[stageNumber as keyof typeof STAGE_CONFIG];
 
   useEffect(() => {
-    loadProject();
+    if (!authLoading && !user) {
+      router.push("/auth/login");
+    } else if (user) {
+      loadProject();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, user, authLoading]);
 
   useEffect(() => {
     scrollToBottom();
@@ -124,15 +129,15 @@ export default function StagePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const getToken = () => {
+     const storageKey = Object.keys(localStorage).find(k => k.startsWith("instantdb-token") || k.includes("token")); 
+     return storageKey ? localStorage.getItem(storageKey) : "";
+  };
+
   const autoSaveConversation = async () => {
     try {
       setAutoSaving(true);
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) return;
+      const token = getToken();
 
       const conversationSummary = messages
         .map((m) => `${m.role}: ${m.content}`)
@@ -142,7 +147,7 @@ export default function StagePage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           summary: conversationSummary,
@@ -158,18 +163,10 @@ export default function StagePage() {
 
   const loadProject = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
-
+      const token = getToken();
       const response = await fetch(`/api/projects/${projectId}/stages/${stageNumber}`, {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -183,7 +180,7 @@ export default function StagePage() {
       // Load project details
       const projectResponse = await fetch("/api/projects", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -214,7 +211,7 @@ export default function StagePage() {
 
           // For stages 2 and 3, add context from previous stages
           if (stageNumber > 1) {
-            const previousContext = await loadPreviousStagesContext(session.access_token);
+            const previousContext = await loadPreviousStagesContext(token || "");
             if (previousContext) {
               greeting += `\n\n**Context from previous stage${stageNumber > 2 ? "s" : ""}:**\n${previousContext}`;
             }
@@ -290,21 +287,13 @@ export default function StagePage() {
     setMessages(newMessages);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
-
+      const token = getToken();
       // Call streaming API
       const response = await fetch("/api/claude/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: newMessages,
@@ -381,22 +370,14 @@ export default function StagePage() {
     setGeneratingSummary(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
-
+      const token = getToken();
       const response = await fetch(
         `/api/projects/${projectId}/stages/${stageNumber}/generate-summary`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -446,14 +427,7 @@ export default function StagePage() {
     setCompleting(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
+      const token = getToken();
 
       // Generate AI summary of the conversation
       const conversationSummary = messages
@@ -467,7 +441,7 @@ export default function StagePage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             completed: true,
@@ -488,7 +462,7 @@ export default function StagePage() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${token}`,
             },
           });
           // Don't block navigation if draft generation fails

@@ -7,11 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,65 +17,60 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+    const user = await verifyAuthToken(token);
 
-    // Get user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({
         error: "Authentication failed",
-        details: authError,
       }, { status: 401 });
     }
 
     // Check if profile exists
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
+    const queryResult = await dbAdmin.query({
+      profiles: {
+        $: { where: { id: user.id } }
+      }
+    });
+    
+    const profile = queryResult.profiles && queryResult.profiles.length > 0 ? queryResult.profiles[0] : null;
 
     // Try to create profile if it doesn't exist
     let profileCreated = false;
     let createError = null;
 
     if (!profile) {
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || null,
-        } as never);
-
-      profileCreated = !insertError;
-      createError = insertError;
+      try {
+        // @ts-ignore - tx types might be tricky to infer perfectly without full generation
+        await dbAdmin.transact([
+          dbAdmin.tx.profiles[user.id].update({
+            email: user.email || "",
+            full_name: "", 
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+        ]);
+        profileCreated = true;
+      } catch (err) {
+        createError = err;
+      }
     }
 
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
-        metadata: user.user_metadata,
       },
       profile: {
         exists: !!profile,
         data: profile,
-        error: profileError?.message || null,
       },
       profileCreation: {
         attempted: !profile,
         success: profileCreated,
-        error: createError?.message || null,
-        errorDetails: createError,
+        error: createError,
       },
       environment: {
-        supabaseUrlSet: !!supabaseUrl,
-        serviceKeySet: !!supabaseServiceKey,
+        instantDbSet: true
       }
     });
 

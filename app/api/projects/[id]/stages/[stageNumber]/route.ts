@@ -4,12 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface RouteContext {
   params: Promise<{
@@ -31,20 +27,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -59,27 +44,38 @@ export async function GET(req: NextRequest, context: RouteContext) {
     }
 
     // Verify project ownership
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", projectId)
-      .eq("user_id", user.id)
-      .single();
+    const projectQuery = await dbAdmin.query({
+      projects: {
+        $: {
+          where: {
+            id: projectId,
+            "owner.id": user.id
+          }
+        }
+      }
+    });
 
-    if (projectError || !project) {
+    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
+
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Fetch stage
-    const { data: stage, error } = await supabase
-      .from("project_stages")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("stage_number", stageNum)
-      .single();
+    const stageQuery = await dbAdmin.query({
+      project_stages: {
+        $: {
+          where: {
+            "project.id": projectId,
+            stage_number: stageNum
+          }
+        }
+      }
+    });
 
-    if (error) {
-      logger.error("Error fetching stage", { error, projectId, stageNumber });
+    const stage = stageQuery.project_stages && stageQuery.project_stages.length > 0 ? stageQuery.project_stages[0] : null;
+
+    if (!stage) {
       return NextResponse.json(
         { error: "Failed to fetch stage" },
         { status: 500 }
@@ -111,20 +107,9 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -138,23 +123,40 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Verify project ownership
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", projectId)
-      .eq("user_id", user.id)
-      .single();
+    // Verify project ownership and get stage
+    const projectQuery = await dbAdmin.query({
+      projects: {
+        $: {
+          where: {
+            id: projectId,
+            "owner.id": user.id
+          }
+        }
+      },
+      project_stages: {
+        $: {
+          where: {
+            "project.id": projectId,
+            stage_number: stageNum
+          }
+        }
+      }
+    });
 
-    if (projectError || !project) {
+    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
+    const stage = projectQuery.project_stages && projectQuery.project_stages.length > 0 ? projectQuery.project_stages[0] : null;
+
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    if (!stage) {
+      return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }
 
     const body = await req.json();
     const { responses, summary, completed } = body;
 
-    const updates: Partial<Database["public"]["Tables"]["project_stages"]["Update"]> =
-      {};
+    const updates: any = {}; // Use any for partial updates
 
     if (responses !== undefined) {
       updates.responses = responses;
@@ -168,31 +170,29 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         updates.completed_at = new Date().toISOString();
       }
     }
+    
+    updates.updated_at = new Date().toISOString();
 
+    const txSteps = [];
+    
     // Update stage
-    const { data: stage, error } = await supabase
-      .from("project_stages")
-      .update(updates as never)
-      .eq("project_id", projectId)
-      .eq("stage_number", stageNum)
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Error updating stage", { error, projectId, stageNumber });
-      return NextResponse.json(
-        { error: "Failed to update stage" },
-        { status: 500 }
-      );
-    }
+    txSteps.push(
+      dbAdmin.tx.project_stages[stage.id].update(updates)
+    );
 
     // If stage is completed, update project's current_stage if needed
     if (completed && stageNum < 3) {
-      await supabase
-        .from("projects")
-        .update({ current_stage: stageNum + 1 } as never)
-        .eq("id", projectId);
+      txSteps.push(
+        dbAdmin.tx.projects[projectId].update({ current_stage: stageNum + 1 })
+      );
     }
+
+    await dbAdmin.transact(txSteps);
+
+    // Return updated stage data
+    // InstantDB transact doesn't return data, so we might need to refetch or just return what we updated.
+    // For simplicity, return the merged object
+    const updatedStage = { ...stage, ...updates };
 
     logger.info("Stage updated", {
       projectId,
@@ -200,7 +200,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       completed,
     });
 
-    return NextResponse.json({ stage });
+    return NextResponse.json({ stage: updatedStage });
   } catch (error) {
     logger.error("Error in PATCH /api/projects/[id]/stages/[stageNumber]", {
       error,

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { db } from "@/lib/instantdb/client";
+import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -17,110 +18,52 @@ import {
   FileText,
 } from "lucide-react";
 
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "in_progress" | "completed" | "archived";
-  current_stage: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export default function DashboardPage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [checkingApiKey, setCheckingApiKey] = useState(true);
+  const { isLoading: authLoading, user, error: authError } = db.useAuth();
+  
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    checkAuthAndApiKey();
-    fetchProjects();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const checkAuthAndApiKey = async () => {
-    console.log("Dashboard - Checking auth...");
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    console.log("Dashboard - getUser result:", {
-      user: !!user,
-      userId: user?.id,
-      email: user?.email,
-      error: userError
-    });
-
-    if (!user) {
-      console.log("Dashboard - No user found, redirecting to login");
-      router.push("/auth/login");
-      return;
-    }
-
-    console.log("Dashboard - User authenticated:", user.email);
-
-    // Check if user has API key
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    console.log("Dashboard - Session:", {
-      hasSession: !!session,
-      accessToken: session?.access_token?.substring(0, 20) + "..."
-    });
-
-    if (session) {
-      try {
-        const response = await fetch("/api/user/api-key", {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setHasApiKey(data.hasApiKey);
+  // Query projects
+  const { data: projectData, isLoading: projectsLoading } = db.useQuery(
+    user ? {
+      projects: {
+        $: {
+          where: { "owner.id": user.id },
+          order: { created_at: "desc" }
         }
-      } catch {
-        console.error("Failed to check API key status");
       }
-    }
+    } : null
+  );
 
-    setCheckingApiKey(false);
-  };
-
-  const fetchProjects = async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) return;
-
-      const response = await fetch("/api/projects", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data.projects || []);
+  // Query profile for API key
+  const { data: profileData, isLoading: profileLoading } = db.useQuery(
+    user ? {
+      profiles: {
+        $: { where: { id: user.id } }
       }
-    } catch {
-      console.error("Failed to fetch projects");
-    } finally {
-      setLoading(false);
-    }
-  };
+    } : null
+  );
+
+  const hasApiKey = !!profileData?.profiles?.[0]?.anthropic_api_key;
+  const projects = projectData?.projects || [];
+  const loading = authLoading || projectsLoading || profileLoading;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.push("/auth/login");
+    return null;
+  }
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return;
@@ -128,37 +71,49 @@ export default function DashboardPage() {
     setCreating(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) return;
-
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+      const projectId = id();
+      const now = new Date().toISOString();
+      
+      // Create project and link to user
+      await db.transact([
+        db.tx.projects[projectId].update({
           name: newProjectName,
-          description: newProjectDescription || null,
-        }),
-      });
+          description: newProjectDescription || "",
+          status: "in_progress",
+          current_stage: 1,
+          created_at: now,
+          updated_at: now,
+        }).link({ owner: user.id }),
+        
+        // Create initial stages
+        ...[1, 2, 3].map(num => {
+            const stageId = id();
+            const stageNames = {
+                1: "Brainstorming & Requirements",
+                2: "Tech Stack & Architecture",
+                3: "UI/UX Design"
+            };
+            return db.tx.project_stages[stageId].update({
+                stage_number: num,
+                stage_name: stageNames[num as 1|2|3],
+                responses: {},
+                completed: false,
+                created_at: now,
+                updated_at: now,
+            }).link({ project: projectId });
+        })
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        router.push(`/projects/${data.project.id}/stage/1`);
-      }
-    } catch {
-      console.error("Failed to create project");
+      router.push(`/projects/${projectId}/stage/1`);
+    } catch (error) {
+      console.error("Failed to create project", error);
     } finally {
       setCreating(false);
     }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await db.auth.signOut();
     router.push("/");
   };
 
@@ -184,7 +139,7 @@ export default function DashboardPage() {
     return stages[stage as keyof typeof stages] || "Unknown";
   };
 
-  if (loading || checkingApiKey) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -326,7 +281,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
+            {projects.map((project: any) => (
               <div
                 key={project.id}
                 className="bg-muted/30 border border-border rounded-lg p-6 hover:border-foreground/50 transition-colors space-y-4"

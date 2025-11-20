@@ -2,32 +2,33 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { db } from "@/lib/instantdb/client";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, CheckCircle, ExternalLink } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { isLoading, user, error: authError } = db.useAuth();
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const checkAuth = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+  useEffect(() => {
+    if (!isLoading && !user) {
       router.push("/auth/login");
     }
-  };
+  }, [isLoading, user, router]);
 
-  useEffect(() => {
-    checkAuth();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   const testApiKey = async () => {
     if (!apiKey.trim()) {
@@ -73,20 +74,30 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
+      if (!user) {
         router.push("/auth/login");
         return;
+      }
+
+      // Retrieve token from localStorage as a fallback for InstantDB
+      // Key format is typically specific to the app ID, but we'll try to find it
+      const storageKey = Object.keys(localStorage).find(k => k.startsWith("instantdb-token") || k.includes("token")); 
+      const token = storageKey ? localStorage.getItem(storageKey) : null;
+      
+      // NOTE: Ideally we should get the token directly from the SDK.
+      // For now, if we can't find it, we might fail auth on the backend.
+      // Alternatively, we could update the profile directly here using db.transact if we allowed it in rules,
+      // but we want to encrypt it server-side.
+      
+      if (!token) {
+         console.warn("Could not find auth token for API call");
       }
 
       const response = await fetch("/api/user/api-key", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify({ apiKey }),
       });

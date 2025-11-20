@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { db } from "@/lib/instantdb/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download, Copy, Loader2, CheckCircle2, FileText, Code, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -28,6 +28,7 @@ export default function PRDPage() {
   const params = useParams();
   const projectId = params.id as string;
 
+  const { isLoading: authLoading, user } = db.useAuth();
   const [project, setProject] = useState<ProjectData | null>(null);
   const [stages, setStages] = useState<StageData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,25 +37,24 @@ export default function PRDPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    loadProjectAndStages();
+    if (!authLoading && !user) {
+      router.push("/auth/login");
+    } else if (user) {
+      loadProjectAndStages();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, user, authLoading]);
 
   const loadProjectAndStages = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
+      // We need a token for API calls. Using localStorage hack for now.
+      const storageKey = Object.keys(localStorage).find(k => k.startsWith("instantdb-token") || k.includes("token")); 
+      const token = storageKey ? localStorage.getItem(storageKey) : "";
 
       // Load project
       const projectResponse = await fetch(`/api/projects/${projectId}`, {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -70,7 +70,7 @@ export default function PRDPage() {
           `/api/projects/${projectId}/stages/${i}`,
           {
             headers: {
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -94,7 +94,7 @@ export default function PRDPage() {
       // Check if PRD already exists
       const prdResponse = await fetch(`/api/projects/${projectId}/prd`, {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -109,7 +109,7 @@ export default function PRDPage() {
       }
 
       // PRD doesn't exist, generate it
-      await generatePRD(stagesData);
+      await generatePRD(stagesData, token || "");
 
       setLoading(false);
     } catch (error) {
@@ -118,22 +118,16 @@ export default function PRDPage() {
     }
   };
 
-  const generatePRD = async (stagesData: StageData[]) => {
+  const generatePRD = async (stagesData: StageData[], token: string) => {
     setGenerating(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) return;
-
       // Call PRD generation API
       const response = await fetch(`/api/projects/${projectId}/generate-prd`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ stages: stagesData }),
       });

@@ -4,14 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import { createClaudeClient } from "@/lib/services/claude.service";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface RouteContext {
   params: Promise<{
@@ -29,20 +25,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -56,56 +41,47 @@ export async function POST(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Verify project ownership
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .eq("user_id", user.id)
-      .single();
+    // Verify project ownership and get stage
+    const projectQuery = await dbAdmin.query({
+      projects: {
+        $: {
+          where: {
+            id: projectId,
+            "owner.id": user.id
+          }
+        }
+      },
+      project_stages: {
+        $: {
+          where: {
+            "project.id": projectId,
+            stage_number: stageNum
+          }
+        }
+      },
+      profiles: {
+        $: { where: { id: user.id } }
+      }
+    });
 
-    type ProjectData = { name: string; description?: string } | null;
-    const typedProject = project as ProjectData;
+    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
+    const stage = projectQuery.project_stages && projectQuery.project_stages.length > 0 ? projectQuery.project_stages[0] : null;
+    const profile = projectQuery.profiles && projectQuery.profiles.length > 0 ? projectQuery.profiles[0] : null;
 
-    if (projectError || !typedProject) {
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-
-    // Get stage data
-    const { data: stage, error: stageError } = await supabase
-      .from("project_stages")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("stage_number", stageNum)
-      .single();
-
-    type StageData = {
-      responses?: { messages?: Array<{ role: string; content: string }> };
-    } | null;
-    const typedStage = stage as StageData;
-
-    if (stageError || !typedStage) {
+    if (!stage) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }
-
-    // Get user's encrypted API key
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("anthropic_api_key")
-      .eq("id", user.id)
-      .single();
-
-    type ProfileData = { anthropic_api_key: string | null } | null;
-    const typedProfile = profile as ProfileData;
-
-    if (profileError || !typedProfile || !typedProfile.anthropic_api_key) {
+    if (!profile || !profile.anthropic_api_key) {
       return NextResponse.json(
         { error: "Anthropic API key not found" },
         { status: 400 }
       );
     }
 
-    const apiKey = decrypt(typedProfile.anthropic_api_key);
+    const apiKey = decrypt(profile.anthropic_api_key);
     const client = createClaudeClient(apiKey);
 
     // Stage-specific summary prompts
@@ -136,9 +112,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
 - Design system and branding`,
     };
 
-    const messages = typedStage.responses?.messages || [];
+    const responses = stage.responses as { messages?: Array<{ role: string; content: string }> } || {};
+    const messages = responses.messages || [];
+    
     const conversationText = messages
-      .map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`)
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n\n");
 
     const systemPrompt = `You are an expert at creating concise, actionable summaries of project planning conversations.
@@ -154,8 +132,8 @@ Keep the summary clear, professional, and focused on actionable insights.`;
 
     const userPrompt = `Please create a comprehensive summary for Stage ${stageNum}: ${stageTitles[stageNum as keyof typeof stageTitles]}
 
-**Project:** ${typedProject.name}
-${typedProject.description ? `**Description:** ${typedProject.description}\n` : ""}
+**Project:** ${project.name}
+${project.description ? `**Description:** ${project.description}\n` : ""}
 
 **Conversation:**
 
@@ -167,7 +145,7 @@ Generate a well-structured summary with overview, key takeaways, and next steps.
 
     // Call Claude to generate summary
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
       messages: [
         {
@@ -182,15 +160,12 @@ Generate a well-structured summary with overview, key takeaways, and next steps.
       response.content[0].type === "text" ? response.content[0].text : "";
 
     // Update stage with summary
-    const { error: updateError } = await supabase
-      .from("project_stages")
-      .update({ summary: summaryContent } as never)
-      .eq("project_id", projectId)
-      .eq("stage_number", stageNum);
-
-    if (updateError) {
-      logger.error("Failed to save summary", { error: updateError, projectId, stageNum });
-    }
+    await dbAdmin.transact([
+      dbAdmin.tx.project_stages[stage.id].update({
+        summary: summaryContent,
+        updated_at: new Date().toISOString()
+      })
+    ]);
 
     logger.info("Summary generated successfully", { projectId, stageNum });
 

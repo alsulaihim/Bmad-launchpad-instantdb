@@ -4,12 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface RouteContext {
   params: Promise<{
@@ -30,35 +26,29 @@ export async function GET(req: NextRequest, context: RouteContext) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: projectId } = params;
 
     // Fetch project
-    const { data: project, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .eq("user_id", user.id)
-      .single();
+    const queryResult = await dbAdmin.query({
+      projects: {
+        $: {
+          where: {
+            id: projectId,
+            "owner.id": user.id
+          }
+        }
+      }
+    });
 
-    if (error || !project) {
-      logger.error("Error fetching project", { error, projectId });
+    const project = queryResult.projects && queryResult.projects.length > 0 ? queryResult.projects[0] : null;
+
+    if (!project) {
       return NextResponse.json(
         { error: "Project not found" },
         { status: 404 }

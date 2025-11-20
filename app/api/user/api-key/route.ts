@@ -4,13 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import { encrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 /**
  * POST /api/user/api-key
@@ -24,17 +20,9 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    const user = await verifyAuthToken(token);
 
-    // Create admin client with service role key (bypasses RLS)
-    const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
-    // Verify the user's identity using their token
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -59,65 +47,25 @@ export async function POST(req: NextRequest) {
     // Encrypt the API key
     const encryptedKey = encrypt(apiKey);
 
-    // First, ensure profile exists (using admin client)
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!existingProfile) {
-      // Create profile if it doesn't exist
-      // Ensure we have an email
-      const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
-
-      const { error: createError } = await supabaseAdmin
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: email,
-          full_name: user.user_metadata?.full_name || null,
+    // Update profile (create if needed via upsert semantics in transact)
+    // InstantDB update creates if not exists (upsert) for that ID? 
+    // Actually update requires existence if we use `update`. `merge` or `set`? 
+    // `update` in InstantDB usually merges. If entity doesn't exist, it creates it (with just those fields).
+    
+    try {
+      await dbAdmin.transact([
+        dbAdmin.tx.profiles[user.id].update({
           anthropic_api_key: encryptedKey,
-        } as never);
-
-      if (createError) {
-        logger.error("Failed to create profile with API key in POST", {
-          error: createError,
-          errorMessage: createError.message,
-          errorDetails: createError.details,
-          errorHint: createError.hint,
-          userId: user.id,
-          email: email,
-        });
-        return NextResponse.json(
-          {
-            error: "Failed to save API key",
-            details: createError.message,
-            hint: createError.hint,
-          },
-          { status: 500 }
-        );
-      }
-    } else {
-      // Update existing profile
-      const { error: updateError } = await supabaseAdmin
-        .from("profiles")
-        .update({
-          anthropic_api_key: encryptedKey,
+          email: user.email || "", // Ensure email is there if creating
           updated_at: new Date().toISOString(),
-        } as never)
-        .eq("id", user.id);
-
-      if (updateError) {
-        logger.error("Failed to save API key", {
-          error: updateError,
-          userId: user.id,
-        });
-        return NextResponse.json(
-          { error: "Failed to save API key" },
-          { status: 500 }
-        );
-      }
+        })
+      ]);
+    } catch (error: any) {
+      logger.error("Failed to save API key", { error, userId: user.id });
+      return NextResponse.json(
+        { error: "Failed to save API key" },
+        { status: 500 }
+      );
     }
 
     logger.info("API key saved successfully", { userId: user.id });
@@ -147,80 +95,45 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    const user = await verifyAuthToken(token);
 
-    // Create admin client with service role key (bypasses RLS)
-    const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
-    // Verify the user's identity using their token
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: profile, error } = await supabaseAdmin
-      .from("profiles")
-      .select("anthropic_api_key")
-      .eq("id", user.id)
-      .maybeSingle();
+    const queryResult = await dbAdmin.query({
+      profiles: {
+        $: { where: { id: user.id } }
+      }
+    });
 
-    type ProfileData = { anthropic_api_key: string | null } | null;
-    const typedProfile = profile as ProfileData;
+    const profile = queryResult.profiles && queryResult.profiles.length > 0 ? queryResult.profiles[0] : null;
 
-    // If profile doesn't exist, create it
+    // If profile doesn't exist, create it (placeholder)
     if (!profile) {
-      // Ensure we have an email
-      const email = user.email || user.user_metadata?.email || `${user.id}@placeholder.local`;
-
-      const { error: createError } = await supabaseAdmin
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: email,
-          full_name: user.user_metadata?.full_name || null,
-        } as never);
-
-      if (createError) {
-        logger.error("Failed to create profile in GET", {
-          error: createError,
-          errorMessage: createError.message,
-          errorDetails: createError.details,
-          errorHint: createError.hint,
-          userId: user.id,
-          email: email,
+      try {
+        await dbAdmin.transact([
+          dbAdmin.tx.profiles[user.id].update({
+            email: user.email || "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+        ]);
+        
+        // Profile created, no API key
+        return NextResponse.json({
+          hasApiKey: false,
         });
-
-        // Return error details for debugging
+      } catch (createError: any) {
+        logger.error("Failed to create profile in GET", { error: createError, userId: user.id });
         return NextResponse.json({
           error: "Failed to create profile",
-          details: createError.message,
-          hint: createError.hint,
         }, { status: 500 });
       }
-
-      // Profile was just created, so no API key yet
-      return NextResponse.json({
-        hasApiKey: false,
-      });
-    }
-
-    if (error) {
-      logger.error("Failed to fetch API key status", {
-        error,
-        userId: user.id,
-      });
-      return NextResponse.json(
-        { error: "Failed to check API key status" },
-        { status: 500 }
-      );
     }
 
     return NextResponse.json({
-      hasApiKey: !!typedProfile?.anthropic_api_key,
-      // Never return the actual key
+      hasApiKey: !!profile.anthropic_api_key,
     });
   } catch (error) {
     logger.error("Error in get API key route", { error });

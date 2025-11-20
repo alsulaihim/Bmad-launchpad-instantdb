@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/types/database.types";
+import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
 import {
   createClaudeClient,
   sendMessageStream,
@@ -14,9 +13,6 @@ import {
 } from "@/lib/services/claude.service";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -31,35 +27,22 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const user = await verifyAuthToken(token);
 
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get user's encrypted API key
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("anthropic_api_key")
-      .eq("id", user.id)
-      .single();
+    const queryResult = await dbAdmin.query({
+      profiles: {
+        $: { where: { id: user.id } }
+      }
+    });
 
-    type ProfileData = { anthropic_api_key: string | null } | null;
-    const typedProfile = profile as ProfileData;
+    const profile = queryResult.profiles && queryResult.profiles.length > 0 ? queryResult.profiles[0] : null;
 
-    if (profileError || !typedProfile || !typedProfile.anthropic_api_key) {
+    if (!profile || !profile.anthropic_api_key) {
       return NextResponse.json(
         {
           error:
@@ -70,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Decrypt the API key
-    const apiKey = decrypt(typedProfile.anthropic_api_key);
+    const apiKey = decrypt(profile.anthropic_api_key);
 
     const body: ChatRequest = await req.json();
     const { messages, agentType } = body;
