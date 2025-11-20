@@ -49,7 +49,7 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      const { user } = await db.auth.verifyMagicCode({ email, code });
+      const { user } = await db.auth.signInWithMagicCode({ email, code });
       
       if (user) {
         // Create/Update profile with full name

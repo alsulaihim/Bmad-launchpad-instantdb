@@ -42,7 +42,7 @@ function LoginContent() {
     setError(null);
 
     try {
-      await db.auth.verifyMagicCode({ email, code });
+      await db.auth.signInWithMagicCode({ email, code });
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.body?.message || err.message || "Invalid code");

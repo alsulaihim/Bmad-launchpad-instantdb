@@ -33,7 +33,7 @@ export default function DashboardPage() {
       projects: {
         $: {
           where: { "owner.id": user.id },
-          order: { created_at: "desc" }
+          order: { serverCreatedAt: "desc" }
         }
       }
     } : null

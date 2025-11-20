@@ -32,16 +32,12 @@ export async function GET(req: NextRequest) {
       projects: {
         $: {
           where: { "owner.id": user.id },
-          order: { created_at: "desc" } // InstantDB sort syntax might differ, checking...
-          // InstantQL doesn't support server-side sort in 'query' effectively yet? 
-          // Actually it does via sort key or client side. 
-          // For now, let's just fetch and sort in memory if needed, or assume basic order.
-        } 
+          order: { serverCreatedAt: "desc" }
+        }
       }
     });
 
     const projects = queryResult.projects || [];
-    // Sort in memory if needed
     projects.sort((a: any, b: any) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );

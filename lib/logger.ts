@@ -1,8 +1,7 @@
-import winston from "winston";
-
 /**
  * Centralized logging utility
- * Provides structured logging with different levels using Winston
+ * Provides structured logging with different levels
+ * Browser-compatible implementation that works in both client and server environments
  */
 
 type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
@@ -12,24 +11,52 @@ interface LogContext {
   correlationId?: string;
 }
 
-// Define custom levels if needed, but standard npm levels are fine.
-// Winston levels: error: 0, warn: 1, info: 2, http: 3, verbose: 4, debug: 5, silly: 6
-// We map:
-// fatal -> error (with metadata)
-// error -> error
-// warn -> warn
-// info -> info
-// debug -> debug
-// trace -> silly
+// Browser-compatible logger implementation
+const createBrowserLogger = () => {
+  const shouldLog = (level: LogLevel): boolean => {
+    const isProd = process.env.NODE_ENV === "production";
+    const logLevels: LogLevel[] = ["fatal", "error", "warn", "info", "debug", "trace"];
+    const minLevel = isProd ? "info" : "debug";
+    const minLevelIndex = logLevels.indexOf(minLevel);
+    const currentLevelIndex = logLevels.indexOf(level);
+    return currentLevelIndex <= minLevelIndex;
+  };
 
-const winstonLogger = winston.createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [new winston.transports.Console()],
-});
+  return {
+    log: (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
+      if (!shouldLog(level)) return;
+
+      const timestamp = new Date().toISOString();
+      const logData = {
+        timestamp,
+        level,
+        message,
+        ...meta,
+      };
+
+      // Use appropriate console method
+      /* eslint-disable no-console */
+      switch (level) {
+        case "fatal":
+        case "error":
+          console.error(JSON.stringify(logData));
+          break;
+        case "warn":
+          console.warn(JSON.stringify(logData));
+          break;
+        case "trace":
+        case "debug":
+          console.debug(JSON.stringify(logData));
+          break;
+        default:
+          console.log(JSON.stringify(logData));
+      }
+      /* eslint-enable no-console */
+    },
+  };
+};
+
+const browserLogger = createBrowserLogger();
 
 /**
  * Logger class for structured logging
@@ -74,28 +101,7 @@ class Logger {
       ...(sanitizedContext && { context: sanitizedContext }),
     };
 
-    switch (level) {
-      case "fatal":
-        winstonLogger.error(message, { ...meta, fatal: true });
-        break;
-      case "error":
-        winstonLogger.error(message, meta);
-        break;
-      case "warn":
-        winstonLogger.warn(message, meta);
-        break;
-      case "info":
-        winstonLogger.info(message, meta);
-        break;
-      case "debug":
-        winstonLogger.debug(message, meta);
-        break;
-      case "trace":
-        winstonLogger.silly(message, meta);
-        break;
-      default:
-        winstonLogger.info(message, meta);
-    }
+    browserLogger.log(level, message, meta);
   }
 
   trace(message: string, context?: LogContext) {

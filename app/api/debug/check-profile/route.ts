@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
 
     if (!profile) {
       try {
-        // @ts-ignore - tx types might be tricky to infer perfectly without full generation
         await dbAdmin.transact([
           dbAdmin.tx.profiles[user.id].update({
             email: user.email || "",
