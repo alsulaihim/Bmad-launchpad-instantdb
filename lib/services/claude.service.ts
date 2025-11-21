@@ -130,41 +130,28 @@ export async function sendMessage(
 export async function loadBMADAgentPrompt(
   agentType: "analyst" | "architect" | "designer" | "pm" | "scrum-master" | "developer"
 ): Promise<string> {
-  // In a real implementation, this would load the actual BMAD agent prompts
-  // from the bmad/ directory. For now, we'll return simplified prompts.
+  // Load comprehensive BMAD agent prompts from markdown files
+  const fs = require('fs').promises;
+  const path = require('path');
 
-  const prompts = {
-    analyst: `You are the BMAD Analyst agent, an expert in project brainstorming and requirements gathering.
-Your role is to:
-1. Ask clarifying questions about the project vision and goals
-2. Help identify core features and functionality
-3. Uncover constraints, risks, and success criteria
-4. Document comprehensive project requirements
+  const agentFilePaths: Record<string, string> = {
+    analyst: path.join(process.cwd(), 'lib/bmad-agents/analyst.md'),
+    architect: path.join(process.cwd(), 'lib/bmad-agents/architect.md'),
+    designer: path.join(process.cwd(), 'lib/bmad-agents/designer.md'),
+  };
 
-Guide the user through a structured brainstorming process using the BMAD methodology.
-Be thorough but conversational. Ask one question at a time and build on previous answers.`,
+  // Try to load from file, fall back to basic prompts if file doesn't exist
+  try {
+    if (agentFilePaths[agentType]) {
+      const promptContent = await fs.readFile(agentFilePaths[agentType], 'utf-8');
+      return promptContent;
+    }
+  } catch (error) {
+    logger.warn(`Failed to load BMAD agent file for ${agentType}, using fallback`, { error });
+  }
 
-    architect: `You are the BMAD Architect agent, an expert in technical architecture and technology selection.
-Your role is to:
-1. Recommend optimal tech stacks based on project requirements
-2. Design system architecture and component structure
-3. Identify technical constraints and trade-offs
-4. Define coding standards and best practices
-
-Help the user select the right technologies and design a solid technical foundation.
-Explain your recommendations and provide alternatives when appropriate.`,
-
-    designer: `You are the BMAD UI/UX Designer agent, an expert in user interface and user experience design.
-Your role is to:
-1. Design intuitive user interfaces and interaction patterns
-2. Create wireframes and component specifications
-3. Establish design systems and visual guidelines
-4. Ensure accessibility, responsiveness, and modern UX best practices
-
-Help the user create a comprehensive UI/UX specification for their project.
-Focus on user flows, visual hierarchy, component libraries, and delightful user experiences.
-Ask about user personas, key user journeys, and design preferences.`,
-
+  // Fallback prompts for agents without dedicated files yet
+  const fallbackPrompts: Record<string, string> = {
     pm: `You are the BMAD Product Manager agent, an expert in product strategy and requirements coordination.
 Your role is to:
 1. Coordinate between business goals and technical implementation
@@ -181,7 +168,7 @@ Your role is to facilitate the development process and ensure smooth execution o
 Your role is to implement features according to specifications and best practices.`,
   };
 
-  return prompts[agentType] || prompts.analyst;
+  return fallbackPrompts[agentType] || fallbackPrompts.pm;
 }
 
 /**
