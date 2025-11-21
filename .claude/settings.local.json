@@ -43,7 +43,17 @@
       "Bash(supabase db execute:*)",
       "Bash(supabase db pull:*)",
       "Bash(supabase migration repair:*)",
-      "Bash(supabase status:*)"
+      "Bash(supabase status:*)",
+      "Bash(vercel --version:*)",
+      "Bash(vercel login)",
+      "Bash(vercel link:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(vercel ls:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(vercel env pull:*)",
+      "Bash(vercel env:*)",
+      "Bash(npx instant-cli:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

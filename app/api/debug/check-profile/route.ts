@@ -7,31 +7,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({
-        error: "Authentication failed",
-      }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     // Check if profile exists
     const queryResult = await dbAdmin.query({
       profiles: {
-        $: { where: { id: user.id } }
+        $: { where: { id: userId } }
       }
     });
-    
+
     const profile = queryResult.profiles && queryResult.profiles.length > 0 ? queryResult.profiles[0] : null;
 
     // Try to create profile if it doesn't exist
@@ -41,9 +34,9 @@ export async function GET(req: NextRequest) {
     if (!profile) {
       try {
         await dbAdmin.transact([
-          dbAdmin.tx.profiles[user.id].update({
-            email: user.email || "",
-            full_name: "", 
+          dbAdmin.tx.profiles[userId].update({
+            email: "",
+            full_name: "",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -56,8 +49,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
+        id: userId,
       },
       profile: {
         exists: !!profile,

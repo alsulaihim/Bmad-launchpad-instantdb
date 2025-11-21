@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import { encrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 
@@ -14,20 +14,15 @@ import { logger } from "@/lib/logger";
  */
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
-    const { apiKey } = body;
+    const { apiKey, userId } = body;
+
+    if (!userId || typeof userId !== "string") {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
 
     if (!apiKey || typeof apiKey !== "string") {
       return NextResponse.json(
@@ -44,35 +39,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Encrypt the API key
+    // Encrypt the API key and return it (client will save to InstantDB)
     const encryptedKey = encrypt(apiKey);
 
-    // Update profile (create if needed via upsert semantics in transact)
-    // InstantDB update creates if not exists (upsert) for that ID? 
-    // Actually update requires existence if we use `update`. `merge` or `set`? 
-    // `update` in InstantDB usually merges. If entity doesn't exist, it creates it (with just those fields).
-    
-    try {
-      await dbAdmin.transact([
-        dbAdmin.tx.profiles[user.id].update({
-          anthropic_api_key: encryptedKey,
-          email: user.email || "", // Ensure email is there if creating
-          updated_at: new Date().toISOString(),
-        })
-      ]);
-    } catch (error: any) {
-      logger.error("Failed to save API key", { error, userId: user.id });
-      return NextResponse.json(
-        { error: "Failed to save API key" },
-        { status: 500 }
-      );
-    }
-
-    logger.info("API key saved successfully", { userId: user.id });
+    logger.info("API key encrypted successfully", { userId });
 
     return NextResponse.json({
       success: true,
-      message: "API key saved successfully",
+      encryptedKey,
+      message: "API key encrypted successfully",
     });
   } catch (error) {
     logger.error("Error in save API key route", { error });
@@ -86,46 +61,42 @@ export async function POST(req: NextRequest) {
 /**
  * GET /api/user/api-key
  * Check if user has an API key configured
+ * Expects userId as query parameter
  */
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     const queryResult = await dbAdmin.query({
       profiles: {
-        $: { where: { id: user.id } }
+        $: { where: { id: userId } }
       }
     });
 
     const profile = queryResult.profiles && queryResult.profiles.length > 0 ? queryResult.profiles[0] : null;
 
-    // If profile doesn't exist, create it (placeholder)
+    // If profile doesn't exist, create it
     if (!profile) {
       try {
         await dbAdmin.transact([
-          dbAdmin.tx.profiles[user.id].update({
-            email: user.email || "",
+          dbAdmin.tx.profiles[userId].update({
+            email: "",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
         ]);
-        
+
         // Profile created, no API key
         return NextResponse.json({
           hasApiKey: false,
         });
       } catch (createError: any) {
-        logger.error("Failed to create profile in GET", { error: createError, userId: user.id });
+        logger.error("Failed to create profile in GET", { error: createError, userId });
         return NextResponse.json({
           error: "Failed to create profile",
         }, { status: 500 });

@@ -178,9 +178,11 @@ export default function StagePage() {
       setStageData(fetchedStageData.stage);
 
       // Load project details
-      const projectResponse = await fetch("/api/projects", {
+      if (!user) return;
+
+      const projectResponse = await fetch(`/api/projects?userId=${user.id}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -287,17 +289,18 @@ export default function StagePage() {
     setMessages(newMessages);
 
     try {
-      const token = getToken();
+      if (!user) return;
+
       // Call streaming API
       const response = await fetch("/api/claude/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: newMessages,
           agentType: stageConfig.agentType,
+          userId: user.id,
         }),
       });
 

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import { logger } from "@/lib/logger";
 
 interface RouteContext {
@@ -21,18 +21,6 @@ interface RouteContext {
 export async function GET(req: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id: projectId, stageNumber } = params;
     const stageNum = parseInt(stageNumber);
 
@@ -41,24 +29,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
         { error: "Invalid stage number" },
         { status: 400 }
       );
-    }
-
-    // Verify project ownership
-    const projectQuery = await dbAdmin.query({
-      projects: {
-        $: {
-          where: {
-            id: projectId,
-            "owner.id": user.id
-          }
-        }
-      }
-    });
-
-    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
-
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Fetch stage
@@ -101,18 +71,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id: projectId, stageNumber } = params;
     const stageNum = parseInt(stageNumber);
 
@@ -123,16 +81,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Verify project ownership and get stage
-    const projectQuery = await dbAdmin.query({
-      projects: {
-        $: {
-          where: {
-            id: projectId,
-            "owner.id": user.id
-          }
-        }
-      },
+    // Get stage
+    const stageQuery = await dbAdmin.query({
       project_stages: {
         $: {
           where: {
@@ -143,12 +93,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       }
     });
 
-    const project = projectQuery.projects && projectQuery.projects.length > 0 ? projectQuery.projects[0] : null;
-    const stage = projectQuery.project_stages && projectQuery.project_stages.length > 0 ? projectQuery.project_stages[0] : null;
+    const stage = stageQuery.project_stages && stageQuery.project_stages.length > 0 ? stageQuery.project_stages[0] : null;
 
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
     if (!stage) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }

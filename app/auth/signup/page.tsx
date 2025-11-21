@@ -61,7 +61,8 @@ export default function SignupPage() {
             updated_at: new Date().toISOString(),
           })
         ]);
-        router.push("/dashboard");
+        // Redirect to onboarding to set up API key
+        router.push("/onboarding");
       }
     } catch (err: any) {
       setError(err.body?.message || err.message || "Invalid code");

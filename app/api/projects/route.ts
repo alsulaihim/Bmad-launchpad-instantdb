@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import { id } from "@instantdb/admin";
 import { logger } from "@/lib/logger";
 
@@ -14,24 +14,20 @@ import { logger } from "@/lib/logger";
  */
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Get userId from query parameter
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     // Fetch user's projects
-    // Query projects where owner.id matches user.id
+    // Query projects where owner.id matches userId
     const queryResult = await dbAdmin.query({
       projects: {
         $: {
-          where: { "owner.id": user.id },
+          where: { "owner.id": userId },
           order: { serverCreatedAt: "desc" }
         }
       }
@@ -58,20 +54,12 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
-    const { name, description } = body;
+    const { name, description, userId } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
 
     if (!name || typeof name !== "string") {
       return NextResponse.json(
@@ -104,7 +92,7 @@ export async function POST(req: NextRequest) {
         current_stage: 1,
         created_at: now,
         updated_at: now,
-      }).link({ owner: user.id })
+      }).link({ owner: userId })
     );
 
     // Create Stages
@@ -133,14 +121,62 @@ export async function POST(req: NextRequest) {
       current_stage: 1,
       created_at: now,
       updated_at: now,
-      user_id: user.id // mimic Supabase response
+      user_id: userId
     };
 
-    logger.info("Project created", { projectId, userId: user.id });
+    logger.info("Project created", { projectId, userId });
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     logger.error("Error in POST /api/projects", { error });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/projects?projectId=xxx&userId=xxx
+ * Delete a project and all associated data
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const projectId = searchParams.get("projectId");
+    const userId = searchParams.get("userId");
+
+    if (!projectId || !userId) {
+      return NextResponse.json(
+        { error: "Project ID and User ID are required" },
+        { status: 400 }
+      );
+    }
+
+    // Verify project ownership
+    const queryResult = await dbAdmin.query({
+      projects: {
+        $: { where: { id: projectId, "owner.id": userId } }
+      }
+    });
+
+    if (!queryResult.projects || queryResult.projects.length === 0) {
+      return NextResponse.json(
+        { error: "Project not found or access denied" },
+        { status: 404 }
+      );
+    }
+
+    // Delete the project (cascade should handle related data)
+    await dbAdmin.transact([
+      dbAdmin.tx.projects[projectId].delete()
+    ]);
+
+    logger.info("Project deleted", { projectId, userId });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    logger.error("Error in DELETE /api/projects", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

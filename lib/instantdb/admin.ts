@@ -18,14 +18,3 @@ export const dbAdmin = init({
   schema,
 });
 
-export async function verifyAuthToken(token: string) {
-  if (!token) return null;
-  try {
-    const user = await dbAdmin.auth.verifyToken(token);
-    return user;
-  } catch (error) {
-    logger.error("Error verifying token", error);
-    return null;
-  }
-}
-

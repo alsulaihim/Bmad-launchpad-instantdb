@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import { createClaudeClient } from "@/lib/services/claude.service";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
@@ -18,16 +18,11 @@ interface RouteContext {
 export async function POST(req: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const body = await req.json();
+    const { userId } = body;
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     const { id: projectId } = params;
@@ -38,7 +33,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         $: {
           where: {
             id: projectId,
-            "owner.id": user.id
+            "owner.id": userId
           }
         }
       }
@@ -74,7 +69,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // Get user's encrypted API key from profiles
     const profileQuery = await dbAdmin.query({
       profiles: {
-        $: { where: { id: user.id } }
+        $: { where: { id: userId } }
       }
     });
     

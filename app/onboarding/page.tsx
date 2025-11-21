@@ -79,35 +79,36 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Retrieve token from localStorage as a fallback for InstantDB
-      // Key format is typically specific to the app ID, but we'll try to find it
-      const storageKey = Object.keys(localStorage).find(k => k.startsWith("instantdb-token") || k.includes("token")); 
-      const token = storageKey ? localStorage.getItem(storageKey) : null;
-      
-      // NOTE: Ideally we should get the token directly from the SDK.
-      // For now, if we can't find it, we might fail auth on the backend.
-      // Alternatively, we could update the profile directly here using db.transact if we allowed it in rules,
-      // but we want to encrypt it server-side.
-      
-      if (!token) {
-         console.warn("Could not find auth token for API call");
-      }
-
-      const response = await fetch("/api/user/api-key", {
+      // First, encrypt the API key on the server
+      const encryptResponse = await fetch("/api/user/api-key", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token || ""}`,
         },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({
+          apiKey,
+          userId: user.id
+        }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!encryptResponse.ok) {
+        const data = await encryptResponse.json();
         setError(data.error || "Failed to save API key");
         return;
       }
 
+      const { encryptedKey } = await encryptResponse.json();
+
+      // Then, save to InstantDB using client SDK for immediate cache update
+      await db.transact([
+        db.tx.profiles[user.id].update({
+          anthropic_api_key: encryptedKey,
+          updated_at: new Date().toISOString(),
+        })
+      ]);
+
+      // Small delay to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 300));
       router.push("/dashboard");
     } catch {
       setError("An unexpected error occurred");

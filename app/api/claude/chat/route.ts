@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import {
   createClaudeClient,
   sendMessageStream,
@@ -16,27 +16,23 @@ import { logger } from "@/lib/logger";
 
 interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
-  agentType: "analyst" | "architect" | "pm";
+  agentType: "analyst" | "architect" | "designer" | "pm";
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Get userId from request body (sent from client)
+    const body: ChatRequest & { userId?: string } = await req.json();
+    const { messages, agentType, userId } = body;
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     // Get user's encrypted API key
     const queryResult = await dbAdmin.query({
       profiles: {
-        $: { where: { id: user.id } }
+        $: { where: { id: userId } }
       }
     });
 
@@ -55,9 +51,6 @@ export async function POST(req: NextRequest) {
     // Decrypt the API key
     const apiKey = decrypt(profile.anthropic_api_key);
 
-    const body: ChatRequest = await req.json();
-    const { messages, agentType } = body;
-
     // Validate request
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -66,9 +59,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!agentType || !["analyst", "architect", "pm"].includes(agentType)) {
+    if (!agentType || !["analyst", "architect", "designer", "pm"].includes(agentType)) {
       return NextResponse.json(
-        { error: "Valid agent type is required (analyst, architect, pm)" },
+        { error: "Valid agent type is required (analyst, architect, designer, pm)" },
         { status: 400 }
       );
     }

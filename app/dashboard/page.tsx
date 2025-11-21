@@ -16,6 +16,8 @@ import {
   Loader2,
   LogOut,
   FileText,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -26,6 +28,9 @@ export default function DashboardPage() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Query projects
   const { data: projectData, isLoading: projectsLoading } = db.useQuery(
@@ -40,13 +45,22 @@ export default function DashboardPage() {
   );
 
   // Query profile for API key
-  const { data: profileData, isLoading: profileLoading } = db.useQuery(
+  const { data: profileData, isLoading: profileLoading, error: profileError } = db.useQuery(
     user ? {
       profiles: {
         $: { where: { id: user.id } }
       }
     } : null
   );
+
+  // Debug logging
+  if (profileData && user) {
+    console.log("Profile query result:", {
+      userId: user.id,
+      profiles: profileData.profiles,
+      hasKey: !!profileData.profiles?.[0]?.anthropic_api_key
+    });
+  }
 
   const hasApiKey = !!profileData?.profiles?.[0]?.anthropic_api_key;
   const projects = projectData?.projects || [];
@@ -69,6 +83,7 @@ export default function DashboardPage() {
     if (!newProjectName.trim()) return;
 
     setCreating(true);
+    setCreateError(null);
 
     try {
       const projectId = id();
@@ -97,16 +112,24 @@ export default function DashboardPage() {
                 stage_number: num,
                 stage_name: stageNames[num as 1|2|3],
                 responses: {},
+                summary: "",
                 completed: false,
+                completed_at: "",
                 created_at: now,
                 updated_at: now,
             }).link({ project: projectId });
         })
       ]);
 
+      // Clear form and close modal
+      setNewProjectName("");
+      setNewProjectDescription("");
+      setShowNewProject(false);
+
       router.push(`/projects/${projectId}/stage/1`);
     } catch (error) {
       console.error("Failed to create project", error);
+      setCreateError("Failed to create project. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -115,6 +138,28 @@ export default function DashboardPage() {
   const handleSignOut = async () => {
     await db.auth.signOut();
     router.push("/");
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user) return;
+
+    setDeleting(true);
+    try {
+      // Delete using client SDK for immediate cache update
+      await db.transact([
+        db.tx.projects[projectId].delete()
+      ]);
+
+      // Close the modal
+      setDeleteConfirm(null);
+
+      // The project list will update automatically via InstantDB reactivity
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      alert("Failed to delete project. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -246,6 +291,12 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {createError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md text-sm text-red-600 dark:text-red-400">
+                  {createError}
+                </div>
+              )}
+
               <Button
                 onClick={handleCreateProject}
                 disabled={!newProjectName.trim() || creating}
@@ -288,7 +339,16 @@ export default function DashboardPage() {
               >
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-lg">{project.name}</h3>
-                  {getStatusIcon(project.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(project.status)}
+                    <button
+                      onClick={() => setDeleteConfirm(project.id)}
+                      className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                      title="Delete project"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {project.description && (
@@ -339,6 +399,53 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-lg max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold">Delete Project</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Are you sure you want to delete this project? This action cannot be undone.
+                  All stages, conversations, and associated data will be permanently removed.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDeleteProject(deleteConfirm)}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Project
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

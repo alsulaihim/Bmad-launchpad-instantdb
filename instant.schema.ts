@@ -96,3 +96,6 @@ export const schema = i.schema({
 
 export type Schema = typeof schema;
 
+// Default export for InstantDB CLI
+export default schema;
+

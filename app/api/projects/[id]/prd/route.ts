@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { dbAdmin, verifyAuthToken } from "@/lib/instantdb/admin";
+import { dbAdmin } from "@/lib/instantdb/admin";
 import { logger } from "@/lib/logger";
 
 interface RouteContext {
@@ -16,16 +16,11 @@ interface RouteContext {
 export async function GET(req: NextRequest, context: RouteContext) {
   const params = await context.params;
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
 
-    const token = authHeader.replace("Bearer ", "");
-    const user = await verifyAuthToken(token);
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
     const { id: projectId } = params;
@@ -36,7 +31,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
         $: {
           where: {
             id: projectId,
-            "owner.id": user.id
+            "owner.id": userId
           }
         }
       }
