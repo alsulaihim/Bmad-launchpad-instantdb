@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { dbAdmin } from "@/lib/instantdb/admin";
-import { createClaudeClient, loadBMADAgentPrompt } from "@/lib/services/claude.service";
+import { createClaudeClient } from "@/lib/services/claude.service";
+import { loadBMADAgentPrompt } from "@/lib/bmad-agents/loader";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 

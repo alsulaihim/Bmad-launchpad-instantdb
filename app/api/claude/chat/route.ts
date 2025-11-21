@@ -9,8 +9,8 @@ import { dbAdmin } from "@/lib/instantdb/admin";
 import {
   createClaudeClient,
   sendMessageStream,
-  loadBMADAgentPrompt,
 } from "@/lib/services/claude.service";
+import { loadBMADAgentPrompt } from "@/lib/bmad-agents/loader";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 
