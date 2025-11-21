@@ -395,6 +395,8 @@ export default function StagePage() {
 
     try {
       const token = getToken();
+      const userMessageCount = messages.filter(m => m.role === 'user').length;
+
       const response = await fetch(
         `/api/projects/${projectId}/stages/${stageNumber}/generate-summary`,
         {
@@ -403,6 +405,7 @@ export default function StagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ userId: user.id }),
         }
       );
 
@@ -410,13 +413,16 @@ export default function StagePage() {
         const data = await response.json();
         setStageSummary(data.summary);
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Summary generation failed:", errorData);
         // Fallback to basic summary
-        const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${Math.floor((messages.length - 1) / 2)} exchanges.`;
+        const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${userMessageCount} user messages.`;
         setStageSummary(basicSummary);
       }
     } catch (error) {
       console.error("Failed to generate summary:", error);
-      const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${Math.floor((messages.length - 1) / 2)} exchanges.`;
+      const userMessageCount = messages.filter(m => m.role === 'user').length;
+      const basicSummary = `# Stage ${stageNumber} Summary\n\nConversation completed with ${userMessageCount} user messages.`;
       setStageSummary(basicSummary);
     } finally {
       setGeneratingSummary(false);
