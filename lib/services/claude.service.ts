@@ -188,32 +188,37 @@ Your role is to implement features according to specifications and best practice
  * Generate initial greeting from BMAD agent
  * @param agentType - Type of BMAD agent
  * @param projectName - Name of the project (optional)
+ * @param projectDescription - Description of the project (optional)
  * @returns Greeting message
  */
 export function generateAgentGreeting(
   agentType: string,
-  projectName?: string
+  projectName?: string,
+  projectDescription?: string | null
 ): string {
   const projectRef = projectName ? ` for "${projectName}"` : "";
+  const descriptionContext = projectDescription
+    ? `\n\n**Project Context:** ${projectDescription}\n`
+    : "";
 
   const greetings = {
-    analyst: `Hello! I'm the BMAD Analyst agent, and I'm here to help you brainstorm and define the requirements${projectRef}.
+    analyst: `Hello! I'm the BMAD Analyst agent, and I'm here to help you brainstorm and define the requirements${projectRef}.${descriptionContext}
 
 Let's start with the most important question: **What problem are you trying to solve, and who will benefit from this solution?**`,
 
-    architect: `Welcome! I'm the BMAD Architect agent, and I'll help you design the technical architecture${projectRef}.
+    architect: `Welcome! I'm the BMAD Architect agent, and I'll help you design the technical architecture${projectRef}.${descriptionContext}
 
 Based on your requirements, let's discuss the optimal tech stack and system design.
 
 **What type of application are you building?** (e.g., web app, mobile app, API, desktop application)`,
 
-    designer: `Hi! I'm the BMAD UI/UX Designer agent, and I'll help you create an amazing user experience${projectRef}.
+    designer: `Hi! I'm the BMAD UI/UX Designer agent, and I'll help you create an amazing user experience${projectRef}.${descriptionContext}
 
 Let's design an intuitive and beautiful interface that your users will love.
 
 **What is the primary user experience you want to create?** Think about the first interaction a user will have with your product and what feeling you want to evoke.`,
 
-    pm: `Hello! I'm the BMAD Product Manager agent, and I'll help you develop a comprehensive product strategy${projectRef}.
+    pm: `Hello! I'm the BMAD Product Manager agent, and I'll help you develop a comprehensive product strategy${projectRef}.${descriptionContext}
 
 Let's align your business goals with technical execution and create a clear product roadmap.
 
@@ -222,6 +227,6 @@ Let's align your business goals with technical execution and create a clear prod
 
   return (
     greetings[agentType as keyof typeof greetings] ||
-    `Hello! I'm ready to help you with your project${projectRef}.`
+    `Hello! I'm ready to help you with your project${projectRef}.${descriptionContext}`
   );
 }

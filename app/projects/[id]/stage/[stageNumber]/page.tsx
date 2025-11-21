@@ -208,7 +208,8 @@ export default function StagePage() {
           // Only initialize with agent greeting if NOT in review mode (new conversation)
           let greeting = generateAgentGreeting(
             stageConfig.agentType,
-            currentProject?.name
+            currentProject?.name,
+            currentProject?.description
           );
 
           // For stages 2 and 3, add context from previous stages
