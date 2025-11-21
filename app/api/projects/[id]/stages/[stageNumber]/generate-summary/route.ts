@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbAdmin } from "@/lib/instantdb/admin";
 import { createClaudeClient } from "@/lib/services/claude.service";
+import { loadBMADAgentPrompt } from "@/lib/bmad-agents/loader";
 import { decrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 
@@ -79,53 +80,62 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const apiKey = decrypt(profile.anthropic_api_key);
     const client = createClaudeClient(apiKey);
 
-    // Stage-specific summary prompts
-    const stageTitles = {
-      1: "Requirements & Goals",
-      2: "Tech Stack & Architecture",
+    // Map stage numbers to agent types
+    const AGENT_TYPES = {
+      1: "analyst" as const,
+      2: "architect" as const,
+      3: "designer" as const,
+    };
+
+    const STAGE_NAMES = {
+      1: "Brainstorming & Requirements",
+      2: "Technical Architecture",
       3: "UI/UX Design",
     };
 
-    const summaryPrompts = {
-      1: `You are summarizing a brainstorming and requirements gathering session. Focus on:
-- Core project goals and objectives
-- Key features and functionalities
-- Target users and use cases
-- Business requirements and constraints
-- Success criteria`,
-      2: `You are summarizing a technical architecture discussion. Focus on:
-- Chosen tech stack and frameworks
-- System architecture and design patterns
-- Infrastructure and deployment strategy
-- Data models and database design
-- Technical constraints and considerations`,
-      3: `You are summarizing a UI/UX design discussion. Focus on:
-- User interface design patterns
-- User experience flow and navigation
-- Visual design principles and components
-- Accessibility and responsiveness
-- Design system and branding`,
-    };
+    const agentType = AGENT_TYPES[stageNum as keyof typeof AGENT_TYPES];
+
+    // Load the BMAD agent system prompt
+    const agentSystemPrompt = await loadBMADAgentPrompt(agentType);
 
     const responses = stage.responses as { messages?: Array<{ role: string; content: string }> } || {};
     const messages = responses.messages || [];
-    
+
     const conversationText = messages
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n\n");
 
-    const systemPrompt = `You are an expert at creating concise, actionable summaries of project planning conversations.
+    // Create a BMAD-aligned summary prompt that instructs the agent to create a handoff document
+    const summarySystemPrompt = `${agentSystemPrompt}
 
-Your task is to analyze the conversation and create a structured summary with:
-1. A brief overview (2-3 sentences)
-2. Key takeaways (3-5 bullet points of the most important decisions/insights)
-3. Action items or next steps (if applicable)
+---
 
-${summaryPrompts[stageNum as keyof typeof summaryPrompts]}
+IMPORTANT TASK: You have just completed a comprehensive ${STAGE_NAMES[stageNum as keyof typeof STAGE_NAMES]} session with the user.
 
-Keep the summary clear, professional, and focused on actionable insights.`;
+Your task is now to create a **handoff summary** that will be given to the ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} in the next stage.
 
-    const userPrompt = `Please create a comprehensive summary for Stage ${stageNum}: ${stageTitles[stageNum as keyof typeof stageTitles]}
+This summary should be:
+1. **Comprehensive yet concise** - Capture all critical decisions and insights
+2. **Actionable** - Clear enough that the next agent knows exactly what was decided
+3. **Structured** - Use clear headings and bullet points
+4. **Context-rich** - Include the "why" behind decisions, not just the "what"
+
+Format the summary with these sections:
+## Overview
+A 2-3 sentence executive summary of this stage
+
+## Key Decisions & Insights
+Bullet points of the most important conclusions, decisions, or requirements established
+
+## ${stageNum === 1 ? "Requirements for Architecture" : stageNum === 2 ? "Technical Context for Design" : "Design Specifications"}
+Specific details that the next stage needs to know
+
+## Considerations & Constraints
+Any limitations, concerns, or special requirements to keep in mind
+
+${stageNum === 1 ? "## Success Criteria\nHow we'll measure if this project achieves its goals" : ""}`;
+
+    const userPrompt = `Please create a comprehensive handoff summary for the ${STAGE_NAMES[stageNum as keyof typeof STAGE_NAMES]} stage.
 
 **Project:** ${project.name}
 ${project.description ? `**Description:** ${project.description}\n` : ""}
@@ -136,19 +146,19 @@ ${conversationText}
 
 ---
 
-Generate a well-structured summary with overview, key takeaways, and next steps.`;
+Generate a well-structured summary following the format specified in your instructions. This summary will be used by the ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} to understand what was decided in this stage.`;
 
-    // Call Claude to generate summary
+    // Call Claude to generate summary using BMAD agent
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 2000,
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4000,
       messages: [
         {
           role: "user",
           content: userPrompt,
         },
       ],
-      system: systemPrompt,
+      system: summarySystemPrompt,
     });
 
     const summaryContent =
