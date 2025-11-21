@@ -6,6 +6,7 @@ import { db } from "@/lib/instantdb/client";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 import {
   Plus,
   FolderOpen,
@@ -197,10 +198,7 @@ export default function DashboardPage() {
       {/* Navigation */}
       <nav className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-foreground rounded" />
-            <span className="text-xl font-semibold">BMAD Launchpad</span>
-          </div>
+          <Logo />
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleSignOut}>
@@ -221,7 +219,7 @@ export default function DashboardPage() {
                 Anthropic API Key Required
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Connect your Anthropic account to start using the BMAD Framework.
+                Connect your Anthropic account to start planning your projects.
               </p>
               <Button
                 size="sm"
@@ -235,17 +233,18 @@ export default function DashboardPage() {
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Your Projects</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage your BMAD Framework projects
+            <h1 className="text-2xl sm:text-3xl font-bold">Your Projects</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage your projects
             </p>
           </div>
           <Button
             onClick={() => setShowNewProject(true)}
             disabled={!hasApiKey}
             size="lg"
+            className="w-full sm:w-auto"
           >
             <Plus className="h-5 w-5 mr-2" />
             New Project
@@ -254,13 +253,14 @@ export default function DashboardPage() {
 
         {/* New Project Modal */}
         {showNewProject && (
-          <div className="mb-6 bg-muted/30 border border-border rounded-lg p-6 space-y-4">
+          <div className="mb-6 bg-muted/30 border border-border rounded-lg p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Create New Project</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">Create New Project</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowNewProject(false)}
+                className="text-xs sm:text-sm"
               >
                 Cancel
               </Button>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                     Creating...
                   </>
                 ) : (
-                  "Create & Start BMAD Workflow"
+                  "Create & Start Planning"
                 )}
               </Button>
             </div>
@@ -317,28 +317,28 @@ export default function DashboardPage() {
 
         {/* Projects Grid */}
         {projects.length === 0 ? (
-          <div className="text-center py-16">
-            <FolderOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first project to get started with the BMAD Framework
+          <div className="text-center py-12 sm:py-16 px-4">
+            <FolderOpen className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg sm:text-xl font-semibold mb-2">No projects yet</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Create your first project to get started
             </p>
             {hasApiKey && (
-              <Button onClick={() => setShowNewProject(true)} size="lg">
+              <Button onClick={() => setShowNewProject(true)} size="lg" className="w-full sm:w-auto">
                 <Plus className="h-5 w-5 mr-2" />
                 Create Your First Project
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {projects.map((project: any) => (
               <div
                 key={project.id}
-                className="bg-muted/30 border border-border rounded-lg p-6 hover:border-foreground/50 transition-colors space-y-4"
+                className="bg-muted/30 border border-border rounded-lg p-4 sm:p-6 hover:border-foreground/50 transition-colors space-y-3 sm:space-y-4"
               >
-                <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-lg">{project.name}</h3>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-base sm:text-lg">{project.name}</h3>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(project.status)}
                     <button
@@ -376,10 +376,10 @@ export default function DashboardPage() {
                   {project.status === "completed" ? (
                     <Button
                       onClick={() => router.push(`/projects/${project.id}/prd`)}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                       size="sm"
                     >
-                      <FileText className="h-4 w-4 mr-2" />
+                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       View PRD
                     </Button>
                   ) : (
@@ -387,7 +387,7 @@ export default function DashboardPage() {
                       onClick={() =>
                         router.push(`/projects/${project.id}/stage/${project.current_stage}`)
                       }
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                       size="sm"
                     >
                       Continue
@@ -403,14 +403,14 @@ export default function DashboardPage() {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-background border border-border rounded-lg max-w-md w-full p-6 space-y-4">
+          <div className="bg-background border border-border rounded-lg max-w-md w-full p-4 sm:p-6 space-y-4">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-red-500" />
+              <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold">Delete Project</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h3 className="text-base sm:text-lg font-semibold">Delete Project</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                   Are you sure you want to delete this project? This action cannot be undone.
                   All stages, conversations, and associated data will be permanently removed.
                 </p>

@@ -118,29 +118,28 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-3 sm:p-4">
       {/* Theme Toggle - Top Right */}
-      <div className="fixed top-4 right-4">
+      <div className="fixed top-3 right-3 sm:top-4 sm:right-4">
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-2xl space-y-8">
+      <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-block h-12 w-12 bg-foreground rounded mb-4" />
-          <h1 className="text-3xl font-bold">Connect Your Anthropic Account</h1>
-          <p className="text-muted-foreground text-lg">
-            To use the BMAD Framework with Claude AI, you&apos;ll need an Anthropic
-            API key
+          <div className="inline-block h-10 w-10 sm:h-12 sm:w-12 bg-foreground rounded mb-3 sm:mb-4" />
+          <h1 className="text-2xl sm:text-3xl font-bold">Connect Your Anthropic Account</h1>
+          <p className="text-muted-foreground text-sm sm:text-lg px-2">
+            To start planning your projects with Claude, you&apos;ll need an Anthropic API key
           </p>
         </div>
 
         {/* Main Card */}
-        <div className="bg-muted/30 border border-border rounded-lg p-8 space-y-6">
+        <div className="bg-muted/30 border border-border rounded-lg p-4 sm:p-8 space-y-4 sm:space-y-6">
           {/* Instructions */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">How to get your API key:</h2>
-            <ol className="space-y-3 text-muted-foreground">
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-lg sm:text-xl font-semibold">How to get your API key:</h2>
+            <ol className="space-y-2 sm:space-y-3 text-sm sm:text-base text-muted-foreground">
               <li className="flex gap-3">
                 <span className="font-semibold text-foreground">1.</span>
                 <span>
@@ -163,7 +162,7 @@ export default function OnboardingPage() {
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-foreground">3.</span>
-                <span>Click &quot;Create Key&quot; and name it &quot;BMAD-Launchpad&quot;</span>
+                <span>Click &quot;Create Key&quot; and name it &quot;Launchpad&quot;</span>
               </li>
               <li className="flex gap-3">
                 <span className="font-semibold text-foreground">4.</span>
@@ -260,9 +259,8 @@ export default function OnboardingPage() {
               💡 Cost Information
             </h3>
             <p className="text-sm text-muted-foreground">
-              Using the BMAD Framework typically costs <strong>$0.10 - $0.50</strong> per
-              complete project in Claude API usage. You pay Anthropic directly
-              for your usage.
+              Planning a complete project typically costs <strong>$0.10 - $0.50</strong> in
+              Claude API usage. You pay Anthropic directly for your usage.
             </p>
           </div>
         </div>
@@ -277,7 +275,7 @@ export default function OnboardingPage() {
             Skip for now
           </button>
           <br />
-          <span className="text-xs">(You&apos;ll need to add it later to use BMAD)</span>
+          <span className="text-xs">(You&apos;ll need to add it later to start planning)</span>
         </div>
       </div>
     </div>

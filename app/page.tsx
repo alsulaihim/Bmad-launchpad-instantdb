@@ -1,27 +1,37 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Lightbulb, Layers, Palette } from "lucide-react";
+import { ArrowRight, Lightbulb, Layers, Palette, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 
 /**
  * Landing page for Vibe Coding Launchpad
- * Corporate-style design with clear value proposition and workflow overview
+ * Vercel-inspired design with dark theme, gradients, and modern aesthetics
  */
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Background gradient effects */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-orange-500/20 rounded-full blur-[128px]" />
+        <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-slate-400/20 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 left-1/2 w-[500px] h-[500px] bg-orange-400/10 rounded-full blur-[128px]" />
+      </div>
+
       {/* Navigation */}
-      <nav className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-foreground rounded" />
-            <span className="text-xl font-semibold">
-              Vibe Coding Launchpad
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/auth/login">
-              <Button variant="ghost">Sign In</Button>
+      <nav className="border-b border-border backdrop-blur-xl bg-background/80 sticky top-0 z-50">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <Logo />
+          <div className="flex items-center gap-2 sm:gap-6">
+            <Link href="/auth/login" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Sign In
+            </Link>
+            <Link href="/auth/signup">
+              <Button size="sm" className="text-xs sm:text-sm px-2 sm:px-4">
+                Get Started
+              </Button>
             </Link>
             <ThemeToggle />
           </div>
@@ -29,145 +39,174 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-24 md:py-32">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            Transform Ideas into
-            <br />
-            <span className="text-muted-foreground">Production-Ready Code</span>
-          </h1>
-          <p className="text-xl text-muted-foreground leading-relaxed">
-            A structured framework for brainstorming, designing, and launching
-            your next project. Get a comprehensive PRD and AI-ready prompts to
-            accelerate development.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <Link href="/auth/signup">
-              <Button size="lg" className="text-base">
-                Start Your Project
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="#workflow">
-              <Button size="lg" variant="outline" className="text-base">
-                Learn More
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 sm:gap-12 items-center">
+            {/* Left: Hero Content */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border border-border text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3" />
+                <span>Powered by BMAD Framework</span>
+              </div>
 
-      {/* Workflow Section */}
-      <section id="workflow" className="border-t border-border bg-muted/30">
-        <div className="container mx-auto px-4 py-24">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                The BMAD Framework
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                A proven three-stage workflow that guides you from concept to
-                code-ready specification.
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1]">
+                Transform Ideas into Production-Ready Code
+              </h1>
+
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                A structured framework for brainstorming, designing, and launching
+                your next project. Get a comprehensive PRD and AI-ready prompts in minutes.
               </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Link href="/auth/signup" className="w-full sm:w-auto">
+                  <Button className="h-10 px-6 w-full sm:w-auto">
+                    Start Your Project
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="#workflow" className="w-full sm:w-auto">
+                  <Button variant="outline" className="h-10 px-6 w-full sm:w-auto">
+                    Learn More
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            {/* Right: Workflow Cards */}
+            <div className="grid gap-4">
               {/* Stage 1 */}
-              <div className="bg-background border border-border rounded-lg p-8 space-y-4">
-                <div className="h-12 w-12 bg-foreground rounded-lg flex items-center justify-center">
-                  <Lightbulb className="h-6 w-6 text-background" />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Stage 1
+              <div className="group relative bg-card border border-border rounded-xl p-5 hover:border-orange-500/50 transition-all duration-300">
+                <div className="absolute inset-0 bg-gradient-to-b from-orange-500/0 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                <div className="relative flex gap-4 items-start">
+                  <div className="inline-flex h-10 w-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg items-center justify-center flex-shrink-0">
+                    <Lightbulb className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold">
-                    Brainstorming & Requirements
-                  </h3>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Stage 1
+                    </div>
+                    <h3 className="text-lg font-semibold">
+                      Brainstorming & Requirements
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Define your project vision and core features through AI-assisted ideation.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-muted-foreground leading-relaxed">
-                  Define your project vision, core features, and business
-                  objectives through guided questions and AI-assisted ideation.
-                </p>
               </div>
 
               {/* Stage 2 */}
-              <div className="bg-background border border-border rounded-lg p-8 space-y-4">
-                <div className="h-12 w-12 bg-foreground rounded-lg flex items-center justify-center">
-                  <Layers className="h-6 w-6 text-background" />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Stage 2
+              <div className="group relative bg-card border border-border rounded-xl p-5 hover:border-slate-400/50 transition-all duration-300">
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-400/0 to-slate-400/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                <div className="relative flex gap-4 items-start">
+                  <div className="inline-flex h-10 w-10 bg-gradient-to-br from-slate-400 to-slate-500 rounded-lg items-center justify-center flex-shrink-0">
+                    <Layers className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold">
-                    Tech Stack & Architecture
-                  </h3>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Stage 2
+                    </div>
+                    <h3 className="text-lg font-semibold">
+                      Tech Stack & Architecture
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Select optimal technologies and define system architecture.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-muted-foreground leading-relaxed">
-                  Select optimal technologies, define system architecture, and
-                  establish technical constraints based on your requirements.
-                </p>
               </div>
 
               {/* Stage 3 */}
-              <div className="bg-background border border-border rounded-lg p-8 space-y-4">
-                <div className="h-12 w-12 bg-foreground rounded-lg flex items-center justify-center">
-                  <Palette className="h-6 w-6 text-background" />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Stage 3
+              <div className="group relative bg-card border border-border rounded-xl p-5 hover:border-orange-400/50 transition-all duration-300">
+                <div className="absolute inset-0 bg-gradient-to-b from-orange-400/0 to-orange-400/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                <div className="relative flex gap-4 items-start">
+                  <div className="inline-flex h-10 w-10 bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg items-center justify-center flex-shrink-0">
+                    <Palette className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold">UI/UX Design</h3>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Stage 3
+                    </div>
+                    <h3 className="text-lg font-semibold">
+                      UI/UX Design
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Craft user interface specs and modern interaction flows.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-muted-foreground leading-relaxed">
-                  Craft user interface specifications, design patterns, and
-                  interaction flows that align with modern UX principles.
-                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Output Section */}
-      <section className="container mx-auto px-4 py-24">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-muted/50 border border-border rounded-lg p-12 text-center space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Your Comprehensive PRD
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Upon completion, receive a production-ready Product Requirements
-              Document and AI-optimized prompts to kickstart development with
-              any coding agent.
-            </p>
-            <div className="pt-4">
-              <Button size="lg">
-                Get Started Now
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
+      {/* Stats Section */}
+      <section className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-center">
+            <div className="space-y-1">
+              <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-orange-500 to-slate-400 bg-clip-text text-transparent">3</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">Guided Stages</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-400 to-orange-400 bg-clip-text text-transparent">AI</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">Powered</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent">PRD</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">Ready Output</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-300 to-slate-500 bg-clip-text text-transparent">∞</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">Possibilities</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="relative overflow-hidden bg-gradient-to-br from-orange-500/10 via-slate-400/10 to-orange-400/10 border border-border rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.05),transparent_50%)]" />
+            <div className="relative space-y-3 sm:space-y-4">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
+                Your Comprehensive PRD
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mx-auto px-2">
+                Upon completion, receive a production-ready Product Requirements
+                Document and AI-optimized prompts to kickstart development.
+              </p>
+              <div className="pt-2">
+                <Link href="/auth/signup">
+                  <Button className="h-10 px-6 w-full sm:w-auto">
+                    Get Started Now
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-sm text-muted-foreground">
+      <footer className="mt-6 sm:mt-8">
+        <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-4">
+            <div className="text-[10px] sm:text-xs text-muted-foreground text-center md:text-left">
               © 2025 Vibe Coding Launchpad. Built with the BMAD Framework.
             </div>
-            <div className="flex gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">
+            <div className="flex gap-4 sm:gap-6 text-[10px] sm:text-xs">
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                 Documentation
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                 GitHub
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                 Support
               </a>
             </div>

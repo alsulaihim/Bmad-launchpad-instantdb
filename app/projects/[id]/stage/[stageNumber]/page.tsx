@@ -34,21 +34,21 @@ const STAGE_CONFIG = {
   1: {
     name: "Brainstorming & Requirements",
     agentType: "analyst" as const,
-    agentName: "BMAD Analyst",
+    agentName: "Analyst",
     description: "Define your project vision, goals, and core requirements",
     color: "blue",
   },
   2: {
     name: "Tech Stack & Architecture",
     agentType: "architect" as const,
-    agentName: "BMAD Architect",
+    agentName: "Architect",
     description: "Select technologies and design your system architecture",
     color: "purple",
   },
   3: {
     name: "UI/UX Design",
     agentType: "designer" as const,
-    agentName: "BMAD UI/UX Designer",
+    agentName: "Designer",
     description: "Design user interface and experience requirements",
     color: "green",
   },
@@ -164,30 +164,30 @@ export default function StagePage() {
   const loadProject = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`/api/projects/${projectId}/stages/${stageNumber}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      if (!user) return;
 
-      if (!response.ok) {
+      // Load stage data and project details in parallel
+      const [stageResponse, projectResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}/stages/${stageNumber}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`/api/projects?userId=${user.id}`, {
+          headers: { "Content-Type": "application/json" },
+        })
+      ]);
+
+      if (!stageResponse.ok) {
         throw new Error("Failed to load project");
       }
 
-      const fetchedStageData = await response.json();
+      const [fetchedStageData, projectsData] = await Promise.all([
+        stageResponse.json(),
+        projectResponse.ok ? projectResponse.json() : null
+      ]);
+
       setStageData(fetchedStageData.stage);
 
-      // Load project details
-      if (!user) return;
-
-      const projectResponse = await fetch(`/api/projects?userId=${user.id}`, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (projectResponse.ok) {
-        const projectsData = await projectResponse.json();
+      if (projectsData) {
         const currentProject = projectsData.projects.find((p: { id: string }) => p.id === projectId);
         setProject(currentProject);
 
@@ -544,50 +544,52 @@ export default function StagePage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header - Sticky */}
       <div className="sticky top-0 z-10 border-b border-border bg-muted/30 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push(isReviewMode ? `/projects/${projectId}/prd` : "/dashboard")}
+                className="text-xs sm:text-sm"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                {isReviewMode ? "Back to PRD" : "Dashboard"}
+                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">{isReviewMode ? "Back to PRD" : "Dashboard"}</span>
+                <span className="xs:hidden">Back</span>
               </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-semibold">{project?.name}</h1>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <h1 className="text-sm sm:text-xl font-semibold truncate">{project?.name}</h1>
                   {isReviewMode && (
-                    <span className="text-xs font-medium px-2 py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                      (Review Mode)
+                    <span className="text-[10px] sm:text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                      Review
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">
                   Stage {stageNumber}: {stageConfig.name}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className={`h-5 w-5 text-${stageConfig.color}-500`} />
-                <span className="text-sm font-medium">{stageConfig.agentName}</span>
+            <div className="flex items-center gap-1 sm:gap-4 justify-end">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Sparkles className={`h-3 w-3 sm:h-5 sm:w-5 text-${stageConfig.color}-500`} />
+                <span className="text-xs sm:text-sm font-medium">{stageConfig.agentName}</span>
               </div>
               {isReviewMode && (
-                <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
                   <Eye className="h-3 w-3" />
                   <span>Read Only</span>
                 </div>
               )}
               {!isReviewMode && autoSaving && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   <span>Saving...</span>
                 </div>
               )}
               {!isReviewMode && !autoSaving && messages.length > 1 && (
-                <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
                   <Check className="h-3 w-3" />
                   <span>Saved</span>
                 </div>
@@ -599,9 +601,9 @@ export default function StagePage() {
       </div>
 
       {/* Stage Progress - Sticky */}
-      <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-center gap-2">
+      <div className="sticky top-[60px] sm:top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center justify-center gap-1 sm:gap-2">
             {[
               { number: 1, name: "Requirements" },
               { number: 2, name: "Architecture" },
@@ -627,7 +629,7 @@ export default function StagePage() {
                     }`}
                   >
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                      className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 text-xs sm:text-base ${
                         stage.number === stageNumber
                           ? "border-foreground bg-foreground text-background"
                           : stage.number < stageNumber || (isReviewMode && stageData)
@@ -638,7 +640,7 @@ export default function StagePage() {
                       {stage.number}
                     </div>
                     <span
-                      className={`text-xs mt-1 ${
+                      className={`text-[10px] sm:text-xs mt-1 ${
                         stage.number === stageNumber
                           ? "text-foreground font-medium"
                           : stage.number < stageNumber || (isReviewMode && stageData)
@@ -646,12 +648,13 @@ export default function StagePage() {
                           : "text-muted-foreground"
                       }`}
                     >
-                      {stage.name}
+                      <span className="hidden sm:inline">{stage.name}</span>
+                      <span className="sm:hidden">S{stage.number}</span>
                     </span>
                   </button>
                   {stage.number < 3 && (
                     <div
-                      className={`w-16 h-0.5 mb-5 ${
+                      className={`w-8 sm:w-16 h-0.5 mb-4 sm:mb-5 ${
                         stage.number < stageNumber || (isReviewMode && stageData) ? "bg-green-500" : "bg-border"
                       }`}
                     />
@@ -665,18 +668,18 @@ export default function StagePage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="container mx-auto px-4 py-6 max-w-4xl">
-          <div className="space-y-6">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-4xl">
+          <div className="space-y-4 sm:space-y-6">
             {/* Show stage summary at top when in review mode */}
             {isReviewMode && stageSummary && (
-              <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+              <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6">
+                <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                  <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-base sm:text-lg font-semibold text-blue-900 dark:text-blue-100">
                     Stage Summary
                   </h3>
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-blue-900 dark:text-blue-100">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-blue-900 dark:text-blue-100 text-sm">
                   <div className="whitespace-pre-wrap">{stageSummary}</div>
                 </div>
               </div>
@@ -690,7 +693,7 @@ export default function StagePage() {
                 }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                  className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${
                     message.role === "user"
                       ? "bg-foreground text-background"
                       : "bg-muted border border-border"
@@ -714,15 +717,16 @@ export default function StagePage() {
 
       {/* Input */}
       <div className="border-t border-border bg-background">
-        <div className="container mx-auto px-4 py-4 max-w-4xl space-y-3">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-4xl space-y-2 sm:space-y-3">
           {isReviewMode ? (
             /* Review Mode Navigation */
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
               <Button
                 variant="outline"
                 onClick={() => router.push(`/projects/${projectId}/prd`)}
+                className="text-xs sm:text-sm"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Back to PRD
               </Button>
 
@@ -731,17 +735,20 @@ export default function StagePage() {
                   variant="outline"
                   onClick={() => router.push(`/projects/${projectId}/stage/${stageNumber - 1}`)}
                   disabled={stageNumber === 1}
+                  className="flex-1 sm:flex-none text-xs sm:text-sm"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Previous Stage
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Previous</span>
+                  <span className="xs:hidden">Prev</span>
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => router.push(`/projects/${projectId}/stage/${stageNumber + 1}`)}
                   disabled={stageNumber === 3}
+                  className="flex-1 sm:flex-none text-xs sm:text-sm"
                 >
-                  Next Stage
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  Next
+                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                 </Button>
               </div>
             </div>
@@ -756,7 +763,7 @@ export default function StagePage() {
                   onKeyPress={handleKeyPress}
                   placeholder={`Message ${stageConfig.agentName}...`}
                   rows={1}
-                  className="flex-1 px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none overflow-hidden min-h-[42px] max-h-[200px]"
+                  className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground resize-none overflow-hidden min-h-[38px] sm:min-h-[42px] max-h-[200px]"
                   disabled={sending || streaming}
                   style={{ height: "auto" }}
                 />
@@ -764,20 +771,22 @@ export default function StagePage() {
                   onClick={sendMessage}
                   disabled={!input.trim() || sending || streaming}
                   size="lg"
+                  className="px-3 sm:px-4"
                 >
                   {sending || streaming ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
                   ) : (
-                    <Send className="h-5 w-5" />
+                    <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                   )}
                 </Button>
               </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Press Enter to send, Shift+Enter for new line
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  <span className="hidden xs:inline">Press Enter to send, Shift+Enter for new line</span>
+                  <span className="xs:hidden">Enter to send</span>
                 </p>
                 {messages.length >= 3 && (
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     {(() => {
                       const minMessages = { 1: 10, 2: 8, 3: 8 };
                       const required = minMessages[stageNumber as keyof typeof minMessages];
@@ -787,7 +796,7 @@ export default function StagePage() {
 
                       return (
                         <>
-                          <span className={`text-xs ${isReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                          <span className={`text-[10px] sm:text-xs text-center sm:text-left ${isReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                             {current}/{target} exchanges
                           </span>
                           <Button
@@ -795,23 +804,26 @@ export default function StagePage() {
                             disabled={completing || sending || streaming}
                             variant={isReady ? "default" : "outline"}
                             size="sm"
+                            className="text-xs sm:text-sm w-full sm:w-auto"
                           >
                             {completing ? (
                               <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Saving...
+                                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                                <span>Saving...</span>
                               </>
                             ) : (
                               <>
                                 {stageNumber < 3 ? (
                                   <>
-                                    Complete & Continue to Stage {stageNumber + 1}
-                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                    <span className="hidden sm:inline">Complete & Continue to Stage {stageNumber + 1}</span>
+                                    <span className="sm:hidden">Complete Stage {stageNumber}</span>
+                                    <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                                   </>
                                 ) : (
                                   <>
-                                    Complete & Generate PRD
-                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                    <span className="hidden sm:inline">Complete & Generate PRD</span>
+                                    <span className="sm:hidden">Complete & PRD</span>
+                                    <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                                   </>
                                 )}
                               </>
@@ -857,7 +869,7 @@ export default function StagePage() {
               {generatingSummary ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Generating AI summary...</p>
+                  <p className="text-muted-foreground">Generating summary...</p>
                 </div>
               ) : (
                 <div className="prose prose-sm dark:prose-invert max-w-none">

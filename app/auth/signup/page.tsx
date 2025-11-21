@@ -9,9 +9,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/instantdb/client";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -73,16 +74,24 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="fixed top-4 left-4">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Home
+        </Link>
+      </div>
       <div className="fixed top-4 right-4">
         <ThemeToggle />
       </div>
 
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-block h-12 w-12 bg-foreground rounded mb-4" />
+          <div className="flex justify-center mb-4">
+            <Logo />
+          </div>
           <h1 className="text-3xl font-bold">Create Account</h1>
           <p className="text-muted-foreground">
-            Start building with the BMAD Framework
+            Start planning your next project
           </p>
         </div>
 
