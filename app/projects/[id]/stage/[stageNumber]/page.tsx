@@ -205,22 +205,42 @@ export default function StagePage() {
           // Restore saved conversation
           setMessages(fetchedStageData.stage.responses.messages);
         } else if (!isReviewMode) {
-          // Only initialize with agent greeting if NOT in review mode (new conversation)
-          let greeting = generateAgentGreeting(
-            stageConfig.agentType,
-            currentProject?.name,
-            currentProject?.description
-          );
+          // Generate dynamic AI-powered greeting
+          try {
+            const greetingResponse = await fetch(
+              `/api/projects/${projectId}/stages/${stageNumber}/greeting`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ userId: user.id }),
+              }
+            );
 
-          // For stages 2 and 3, add context from previous stages
-          if (stageNumber > 1) {
-            const previousContext = await loadPreviousStagesContext(token || "");
-            if (previousContext) {
-              greeting += `\n\n**Context from previous stage${stageNumber > 2 ? "s" : ""}:**\n${previousContext}`;
+            if (greetingResponse.ok) {
+              const { greeting } = await greetingResponse.json();
+              setMessages([{ role: "assistant", content: greeting }]);
+            } else {
+              // Fallback to static greeting if API fails
+              const greeting = generateAgentGreeting(
+                stageConfig.agentType,
+                currentProject?.name,
+                currentProject?.description
+              );
+              setMessages([{ role: "assistant", content: greeting }]);
             }
+          } catch (error) {
+            console.error("Failed to generate dynamic greeting:", error);
+            // Fallback to static greeting
+            const greeting = generateAgentGreeting(
+              stageConfig.agentType,
+              currentProject?.name,
+              currentProject?.description
+            );
+            setMessages([{ role: "assistant", content: greeting }]);
           }
-
-          setMessages([{ role: "assistant", content: greeting }]);
         }
       }
 
