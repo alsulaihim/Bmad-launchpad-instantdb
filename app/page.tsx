@@ -22,18 +22,20 @@ export default function Home() {
 
       {/* Navigation */}
       <nav className="border-b border-border backdrop-blur-xl bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center gap-2 sm:gap-6">
-            <Link href="/auth/login" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Sign In
-            </Link>
-            <Link href="/auth/signup">
-              <Button size="sm" className="text-xs sm:text-sm px-2 sm:px-4">
-                Get Started
-              </Button>
-            </Link>
-            <ThemeToggle />
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Logo />
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Link href="/auth/login" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                Sign In
+              </Link>
+              <Link href="/auth/signup">
+                <Button size="sm" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">
+                  Get Started
+                </Button>
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </nav>

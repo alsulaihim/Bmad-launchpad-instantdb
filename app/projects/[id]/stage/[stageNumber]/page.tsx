@@ -545,63 +545,70 @@ export default function StagePage() {
       {/* Header - Sticky */}
       <div className="sticky top-0 z-10 border-b border-border bg-muted/30 backdrop-blur-sm">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(isReviewMode ? `/projects/${projectId}/prd` : "/dashboard")}
-                className="text-xs sm:text-sm"
-              >
-                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden xs:inline">{isReviewMode ? "Back to PRD" : "Dashboard"}</span>
-                <span className="xs:hidden">Back</span>
-              </Button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <h1 className="text-sm sm:text-xl font-semibold truncate">{project?.name}</h1>
-                  {isReviewMode && (
-                    <span className="text-[10px] sm:text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
-                      Review
-                    </span>
-                  )}
+          <div className="flex flex-col gap-2">
+            {/* Top row: Back button + Project name + Theme toggle */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push(isReviewMode ? `/projects/${projectId}/prd` : "/dashboard")}
+                  className="text-xs sm:text-sm flex-shrink-0"
+                >
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">{isReviewMode ? "Back to PRD" : "Dashboard"}</span>
+                  <span className="xs:hidden">Back</span>
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <h1 className="text-sm sm:text-base md:text-xl font-semibold truncate">{project?.name}</h1>
+                    {isReviewMode && (
+                      <span className="text-[10px] sm:text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap flex-shrink-0">
+                        Review
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">
-                  Stage {stageNumber}: {stageConfig.name}
-                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-4 justify-end">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Sparkles className={`h-3 w-3 sm:h-5 sm:w-5 text-${stageConfig.color}-500`} />
-                <span className="text-xs sm:text-sm font-medium">{stageConfig.agentName}</span>
-              </div>
-              {isReviewMode && (
-                <div className="hidden sm:flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
-                  <Eye className="h-3 w-3" />
-                  <span>Read Only</span>
-                </div>
-              )}
-              {!isReviewMode && autoSaving && (
-                <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Saving...</span>
-                </div>
-              )}
-              {!isReviewMode && !autoSaving && messages.length > 1 && (
-                <div className="hidden sm:flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-                  <Check className="h-3 w-3" />
-                  <span>Saved</span>
-                </div>
-              )}
               <ThemeToggle />
+            </div>
+
+            {/* Bottom row: Stage info + Agent + Status */}
+            <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+              <p className="text-muted-foreground truncate">
+                Stage {stageNumber}: {stageConfig.name}
+              </p>
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Sparkles className={`h-3 w-3 sm:h-4 sm:w-4 text-${stageConfig.color}-500`} />
+                  <span className="font-medium">{stageConfig.agentName}</span>
+                </div>
+                {isReviewMode && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                    <Eye className="h-3 w-3" />
+                    <span>Read Only</span>
+                  </div>
+                )}
+                {!isReviewMode && autoSaving && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Saving...</span>
+                  </div>
+                )}
+                {!isReviewMode && !autoSaving && messages.length > 1 && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                    <Check className="h-3 w-3" />
+                    <span>Saved</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Stage Progress - Sticky */}
-      <div className="sticky top-[60px] sm:top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
+      <div className="sticky top-[88px] sm:top-[96px] z-10 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center justify-center gap-1 sm:gap-2">
             {[
