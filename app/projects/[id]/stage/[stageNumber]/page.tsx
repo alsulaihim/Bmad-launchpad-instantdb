@@ -397,6 +397,10 @@ export default function StagePage() {
       const token = getToken();
       const userMessageCount = messages.filter(m => m.role === 'user').length;
 
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const response = await fetch(
         `/api/projects/${projectId}/stages/${stageNumber}/generate-summary`,
         {
