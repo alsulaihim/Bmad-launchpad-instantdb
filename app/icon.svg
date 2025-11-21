@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main sparkle -->
+  <path d="M16 2L18 12L28 14L18 16L16 26L14 16L4 14L14 12L16 2Z" fill="#f97316"/>
+
+  <!-- Top right sparkle -->
+  <path d="M24 6L25 9L28 10L25 11L24 14L23 11L20 10L23 9L24 6Z" fill="#fb923c"/>
+
+  <!-- Bottom left sparkle -->
+  <path d="M8 18L9 21L12 22L9 23L8 26L7 23L4 22L7 21L8 18Z" fill="#fb923c"/>
+</svg>

@@ -19,6 +19,13 @@ export const metadata: Metadata = {
     "tech stack selection",
     "PRD generator",
   ],
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-icon.png",
+  },
   openGraph: {
     title: "Vibe Coding Launchpad | BMAD Framework",
     description:
