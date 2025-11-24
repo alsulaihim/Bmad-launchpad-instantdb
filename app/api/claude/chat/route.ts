@@ -17,13 +17,15 @@ import { logger } from "@/lib/logger";
 interface ChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   agentType: "analyst" | "architect" | "designer" | "pm";
+  projectId?: string;
+  stageNumber?: number;
 }
 
 export async function POST(req: NextRequest) {
   try {
     // Get userId from request body (sent from client)
     const body: ChatRequest & { userId?: string } = await req.json();
-    const { messages, agentType, userId } = body;
+    const { messages, agentType, userId, projectId, stageNumber } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -70,7 +72,15 @@ export async function POST(req: NextRequest) {
     const client = createClaudeClient(apiKey);
 
     // Load the appropriate BMAD agent system prompt
-    const systemPrompt = await loadBMADAgentPrompt(agentType);
+    let systemPrompt = await loadBMADAgentPrompt(agentType);
+
+    // Add previous stage context to system prompt if we're in stage 2 or 3
+    if (projectId && stageNumber && stageNumber > 1) {
+      const previousContext = await getPreviousStagesContext(projectId, stageNumber);
+      if (previousContext) {
+        systemPrompt += `\n\n---\n\n## CONTEXT FROM PREVIOUS STAGES\n\nThe user has already completed previous stage(s) of this project. Below you'll find both a summary and the full conversation history from earlier stages.\n\n${previousContext}\n\n### How to Use This Context:\n\n1. **Reference the Summary** for a quick overview of key decisions and requirements\n2. **Search the Full Conversation** when you need specific details, examples, or the reasoning behind decisions\n3. **DO NOT ask questions** that were already answered in previous stages\n4. **DO reference and build upon** what was discussed before\n5. **Acknowledge the previous work** - show you've read and understood the context\n\nIMPORTANT: The user should NOT have to repeat themselves. All the information from previous stages is available above. Use it throughout our conversation.`;
+      }
+    }
 
     // Create a readable stream for SSE
     const stream = new ReadableStream({
@@ -125,5 +135,89 @@ export async function POST(req: NextRequest) {
       { error: "Internal server error" },
       { status: 500 }
     );
+  }
+}
+
+async function getPreviousStagesContext(
+  projectId: string,
+  currentStage: number
+): Promise<string | null> {
+  try {
+    let context = "";
+
+    // Load Stage 1 if we're in Stage 2 or 3
+    if (currentStage >= 2) {
+      const stage1Query = await dbAdmin.query({
+        project_stages: {
+          $: {
+            where: {
+              "project.id": projectId,
+              stage_number: 1
+            }
+          }
+        }
+      });
+
+      const stage1 = stage1Query.project_stages && stage1Query.project_stages.length > 0 ? stage1Query.project_stages[0] : null;
+
+      if (stage1?.completed) {
+        context += `### Stage 1: Requirements & Goals (Analyst)\n\n`;
+
+        // Include the summary first for quick reference
+        if (stage1.summary) {
+          context += `**Summary:**\n${stage1.summary}\n\n`;
+        }
+
+        // Include the full conversation for complete context
+        if (stage1.responses?.messages && Array.isArray(stage1.responses.messages)) {
+          context += `**Full Conversation:**\n\n`;
+          const messages = stage1.responses.messages as Array<{ role: string; content: string }>;
+          for (const msg of messages) {
+            context += `**${msg.role.toUpperCase()}:** ${msg.content}\n\n`;
+          }
+          context += `---\n\n`;
+        }
+      }
+    }
+
+    // Load Stage 2 if we're in Stage 3
+    if (currentStage === 3) {
+      const stage2Query = await dbAdmin.query({
+        project_stages: {
+          $: {
+            where: {
+              "project.id": projectId,
+              stage_number: 2
+            }
+          }
+        }
+      });
+
+      const stage2 = stage2Query.project_stages && stage2Query.project_stages.length > 0 ? stage2Query.project_stages[0] : null;
+
+      if (stage2?.completed) {
+        context += `### Stage 2: Tech Stack & Architecture (Architect)\n\n`;
+
+        // Include the summary first for quick reference
+        if (stage2.summary) {
+          context += `**Summary:**\n${stage2.summary}\n\n`;
+        }
+
+        // Include the full conversation for complete context
+        if (stage2.responses?.messages && Array.isArray(stage2.responses.messages)) {
+          context += `**Full Conversation:**\n\n`;
+          const messages = stage2.responses.messages as Array<{ role: string; content: string }>;
+          for (const msg of messages) {
+            context += `**${msg.role.toUpperCase()}:** ${msg.content}\n\n`;
+          }
+          context += `---\n\n`;
+        }
+      }
+    }
+
+    return context || null;
+  } catch (error) {
+    logger.error("Error loading previous stages context", { error });
+    return null;
   }
 }

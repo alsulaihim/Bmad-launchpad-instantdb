@@ -112,46 +112,73 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
 IMPORTANT TASK: You have just completed a comprehensive ${STAGE_NAMES[stageNum as keyof typeof STAGE_NAMES]} session with the user.
 
-Your task is now to create a **handoff summary** that will be given to the ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} in the next stage.
+Your task is now to create a **detailed handoff summary** that will be given to the ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} in the next stage.
+
+CRITICAL: This summary must be COMPREHENSIVE and DETAILED. The next agent will NOT have access to the original conversation, so you must capture:
+- ALL key decisions made during the conversation
+- ALL requirements discussed, including specific details and examples
+- ALL questions asked by the user and answers provided
+- ALL technical preferences, constraints, and considerations mentioned
+- The context and reasoning behind each decision
 
 This summary should be:
-1. **Comprehensive yet concise** - Capture all critical decisions and insights
-2. **Actionable** - Clear enough that the next agent knows exactly what was decided
-3. **Structured** - Use clear headings and bullet points
+1. **Thorough and detailed** - Err on the side of including too much rather than too little. Missing information means the user will have to repeat themselves.
+2. **Actionable** - Clear enough that the next agent knows exactly what was decided without having to ask again
+3. **Structured** - Use clear headings, subheadings, and bullet points for easy navigation
 4. **Context-rich** - Include the "why" behind decisions, not just the "what"
+5. **Question-answer format where applicable** - Capture specific Q&A exchanges that reveal important details
 
 Format the summary with these sections:
 ## Overview
-A 2-3 sentence executive summary of this stage
+A comprehensive 3-5 sentence summary of this stage and what was accomplished
 
 ## Key Decisions & Insights
-Bullet points of the most important conclusions, decisions, or requirements established
+Detailed bullet points of ALL conclusions, decisions, or requirements established. Include sub-bullets for specifics.
 
-## ${stageNum === 1 ? "Requirements for Architecture" : stageNum === 2 ? "Technical Context for Design" : "Design Specifications"}
-Specific details that the next stage needs to know
+## Detailed ${stageNum === 1 ? "Requirements & Specifications" : stageNum === 2 ? "Technical Architecture Details" : "Design Specifications"}
+ALL specific details discussed that the next stage needs to know. Be thorough - include examples, specific preferences, technical details, etc.
+
+## User Preferences & Context
+Specific preferences the user expressed, their background, their goals, and any relevant context about how they'll use this
+
+## Questions Asked & Answered
+Important questions that were asked during the conversation and the answers provided
 
 ## Considerations & Constraints
 Any limitations, concerns, or special requirements to keep in mind
 
-${stageNum === 1 ? "## Success Criteria\nHow we'll measure if this project achieves its goals" : ""}`;
+${stageNum === 1 ? "## Success Criteria\nHow we'll measure if this project achieves its goals" : ""}
 
-    const userPrompt = `Please create a comprehensive handoff summary for the ${STAGE_NAMES[stageNum as keyof typeof STAGE_NAMES]} stage.
+Remember: The next agent cannot ask the user to repeat information. Include ALL relevant details from the conversation.`;
+
+    const userPrompt = `Please create a DETAILED and COMPREHENSIVE handoff summary for the ${STAGE_NAMES[stageNum as keyof typeof STAGE_NAMES]} stage.
 
 **Project:** ${project.name}
 ${project.description ? `**Description:** ${project.description}\n` : ""}
 
-**Conversation:**
+**Full Conversation:**
 
 ${conversationText}
 
 ---
 
-Generate a well-structured summary following the format specified in your instructions. This summary will be used by the ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} to understand what was decided in this stage.`;
+IMPORTANT: Generate a thorough, well-structured summary following the format specified in your instructions.
+
+The ${stageNum === 1 ? "Architect" : stageNum === 2 ? "Designer" : "Development Team"} will use this summary as their ONLY source of information about what was decided in this stage. They will NOT have access to the original conversation.
+
+Therefore, you MUST include:
+- Every specific requirement, feature, or detail discussed
+- All answers to questions that were asked
+- All preferences and constraints mentioned
+- Technical details, examples, and specific use cases
+- The reasoning and context behind decisions
+
+Do NOT summarize too briefly. It's better to include too much information than too little. Missing details will force the user to repeat themselves in the next stage.`;
 
     // Call Claude to generate summary using BMAD agent
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+      max_tokens: 8000, // Increased to allow for comprehensive, detailed summaries
       messages: [
         {
           role: "user",

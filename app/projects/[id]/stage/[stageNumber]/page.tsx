@@ -267,8 +267,8 @@ export default function StagePage() {
         if (stage1Response.ok) {
           const stage1Data = await stage1Response.json();
           if (stage1Data.stage?.completed && stage1Data.stage?.summary) {
-            const summary = stage1Data.stage.summary.split("\n\n").slice(0, 3).join("\n\n");
-            context += `\n**Requirements & Goals (Stage 1):**\n${summary.substring(0, 500)}...\n`;
+            // Include the FULL summary - no truncation
+            context += `\n**Requirements & Goals (Stage 1):**\n${stage1Data.stage.summary}\n\n`;
           }
         }
       }
@@ -285,8 +285,8 @@ export default function StagePage() {
         if (stage2Response.ok) {
           const stage2Data = await stage2Response.json();
           if (stage2Data.stage?.completed && stage2Data.stage?.summary) {
-            const summary = stage2Data.stage.summary.split("\n\n").slice(0, 3).join("\n\n");
-            context += `\n**Tech Stack & Architecture (Stage 2):**\n${summary.substring(0, 500)}...\n`;
+            // Include the FULL summary - no truncation
+            context += `**Tech Stack & Architecture (Stage 2):**\n${stage2Data.stage.summary}\n\n`;
           }
         }
       }
@@ -322,6 +322,8 @@ export default function StagePage() {
           messages: newMessages,
           agentType: stageConfig.agentType,
           userId: user.id,
+          projectId: projectId,
+          stageNumber: stageNumber,
         }),
       });
 

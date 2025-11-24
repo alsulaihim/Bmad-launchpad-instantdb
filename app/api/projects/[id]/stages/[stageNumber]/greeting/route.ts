@@ -101,13 +101,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
 ${contextInfo}
 
-Generate a warm, professional greeting that:
-1. Introduces yourself as the BMAD ${agentType.charAt(0).toUpperCase() + agentType.slice(1)} agent
-2. Shows you've read and understood the project context
-3. Provides 2-3 initial observations or thoughts about the project
+${stageNum > 1 ? `IMPORTANT: You have access to the complete summary from the previous stage(s) above. This contains all the decisions, requirements, and context from earlier conversations. Use this information throughout our conversation so the user doesn't have to repeat themselves.\n\n` : ""}Generate a warm, professional greeting that:
+1. Introduces yourself as the ${agentType.charAt(0).toUpperCase() + agentType.slice(1)} agent
+2. Shows you've read and understood the project context${stageNum > 1 ? " AND the previous stage summary" : ""}
+3. Provides 2-3 initial observations or thoughts about the project${stageNum > 1 ? " based on what was discussed in previous stages" : ""}
 4. Asks a thoughtful, specific opening question tailored to this particular project
 
-Keep it conversational, engaging, and show genuine interest in helping with this specific project. The greeting should be 3-4 paragraphs maximum.`;
+Keep it conversational, engaging, and show genuine interest in helping with this specific project. The greeting should be 3-4 paragraphs maximum.
+
+${stageNum > 1 ? "Remember: You have the full context from previous stages, so avoid asking questions that were already answered." : ""}`;
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -143,7 +145,7 @@ async function getPreviousStagesContext(
   try {
     let context = "";
 
-    // Load Stage 1 summary if we're in Stage 2 or 3
+    // Load Stage 1 if we're in Stage 2 or 3
     if (currentStage >= 2) {
       const stage1Query = await dbAdmin.query({
         project_stages: {
@@ -158,13 +160,23 @@ async function getPreviousStagesContext(
 
       const stage1 = stage1Query.project_stages && stage1Query.project_stages.length > 0 ? stage1Query.project_stages[0] : null;
 
-      if (stage1?.completed && stage1?.summary) {
-        const summary = stage1.summary.split("\n\n").slice(0, 2).join("\n\n");
-        context += `**Previous Stage - Requirements & Goals:**\n${summary.substring(0, 400)}...\n`;
+      if (stage1?.completed) {
+        context += `**Previous Stage - Requirements & Goals (Analyst):**\n\n`;
+
+        // Include summary for greeting generation
+        if (stage1.summary) {
+          context += `${stage1.summary}\n\n`;
+        }
+
+        // Also mention that full conversation is available
+        if (stage1.responses?.messages && Array.isArray(stage1.responses.messages)) {
+          const messageCount = stage1.responses.messages.length;
+          context += `_(Full conversation with ${messageCount} messages is available for reference)_\n\n`;
+        }
       }
     }
 
-    // Load Stage 2 summary if we're in Stage 3
+    // Load Stage 2 if we're in Stage 3
     if (currentStage === 3) {
       const stage2Query = await dbAdmin.query({
         project_stages: {
@@ -179,9 +191,19 @@ async function getPreviousStagesContext(
 
       const stage2 = stage2Query.project_stages && stage2Query.project_stages.length > 0 ? stage2Query.project_stages[0] : null;
 
-      if (stage2?.completed && stage2?.summary) {
-        const summary = stage2.summary.split("\n\n").slice(0, 2).join("\n\n");
-        context += `\n**Previous Stage - Tech Stack & Architecture:**\n${summary.substring(0, 400)}...\n`;
+      if (stage2?.completed) {
+        context += `**Previous Stage - Tech Stack & Architecture (Architect):**\n\n`;
+
+        // Include summary for greeting generation
+        if (stage2.summary) {
+          context += `${stage2.summary}\n\n`;
+        }
+
+        // Also mention that full conversation is available
+        if (stage2.responses?.messages && Array.isArray(stage2.responses.messages)) {
+          const messageCount = stage2.responses.messages.length;
+          context += `_(Full conversation with ${messageCount} messages is available for reference)_\n\n`;
+        }
       }
     }
 
